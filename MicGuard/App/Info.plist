@@ -30,8 +30,6 @@
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2025. All rights reserved.</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>MicGuard needs access to monitor and control your microphone settings.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

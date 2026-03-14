@@ -1,0 +1,587 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		051150142B067422DA56634F /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 06CB407C45957F3D1DA3B1A1 /* UserNotifications.framework */; };
+		07F9667ACC9964EC414E201B /* PreferencesManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9090B7CE10EEA47ADDC7F868 /* PreferencesManagerTests.swift */; };
+		17F6FDB26D51ECBCA88E5800 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48A2E83C7C0A1552B059E390 /* ProcessMonitor.swift */; };
+		252B26D576F0AF1359C11D97 /* OutputDeviceWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0A7A0D04087851FF0A344 /* OutputDeviceWatchdogTests.swift */; };
+		2822A8D38A715FC16A6B03DA /* DeviceSubmenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19207A383ED9BB3AFBE2E7FF /* DeviceSubmenuBuilder.swift */; };
+		2B6FFA37D11AE09E9F5211D5 /* AudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27BE9DA3D097A383FD554197 /* AudioDeviceManager.swift */; };
+		2D0C28F08E4E2189671AF32A /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026BA6A21433C1568EAAE69D /* StatusBarController.swift */; };
+		377FBE04435A4F710B7C8664 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF58486181BD7EAC6339A19D /* AppDelegate.swift */; };
+		3F37E64541024A1935A4EE79 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E6D040238D0366F8D854022 /* ServiceManagement.framework */; };
+		4AA2A2771ED2D157DF8A307F /* MicGuardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */; };
+		4C02C22C3D4E5D9923610D35 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D14FDE4A4BAB4EA87A74DAF5 /* AppKit.framework */; };
+		5F60D898A14EC0DF001E973C /* DeviceWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5402F144B596FE9D04B12231 /* DeviceWatchdog.swift */; };
+		61EF87980C7292C453E3A064 /* OnAirIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D718142792A4F0FFF7A5482 /* OnAirIndicator.swift */; };
+		65044E594F00C21CBEC1716D /* VolumeGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23563E142FC69EE67428040D /* VolumeGuardTests.swift */; };
+		691F0F8CF3CF250C20D1D8BA /* ActivityMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB2729A791348CF3CD2A9F0 /* ActivityMonitorTests.swift */; };
+		7C7AA92E2629894DE14D2784 /* StatsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C84A882C8366DD60D8C247ED /* StatsManagerTests.swift */; };
+		817165F01181142654788D33 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B7A3A1BF72AF0757AFF199D /* CoreAudio.framework */; };
+		82254C399AFF14A7FB1CE54E /* VolumeGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9EF3670D38515CF80725F1 /* VolumeGuard.swift */; };
+		82C66B9309DF87F1F906B6EE /* ProcessMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6609B20D47378A5C9AB137 /* ProcessMonitorTests.swift */; };
+		8418F866A545D7CEE0A46464 /* OutputDeviceSubmenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15468AA3DBB5B0D57A889119 /* OutputDeviceSubmenuBuilder.swift */; };
+		913BFEB4FF0DA78F904D504E /* MenuItemFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824923C92EEC9AB5A32B9B5C /* MenuItemFactory.swift */; };
+		9474CDD3F6E89ECC9B65952B /* StatsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F63A1260DED312BCCD8C589 /* StatsManager.swift */; };
+		9F3EE843A46A8B606A5978A0 /* OnAirSnoozeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41D627FD83CCD96352B8EC3C /* OnAirSnoozeManager.swift */; };
+		9F6741B73A45F8B78A24F4DA /* MockAudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E55EE43EBEC5B1089E6F35 /* MockAudioDeviceManager.swift */; };
+		B0DDF29FF18699A8A714BAFB /* AudioDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65D046220518AE607C60266E /* AudioDeviceTests.swift */; };
+		B524CE1CCCEF19FC50FECBCD /* PreferencesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F857EAE679C6AA4409D5FE /* PreferencesManager.swift */; };
+		D20E393BF9E5E9BA03FF7B5B /* OnAirIndicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951A3423131A20D2D7086FA6 /* OnAirIndicatorTests.swift */; };
+		EEDA6E1DD2C97227F4AA7CAE /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D855FFC6A0E3F07DF4B3338 /* NotificationManager.swift */; };
+		F7ED92E2EF2D164363C12996 /* DeviceWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8917135B81208F598CC7F2D2 /* DeviceWatchdogTests.swift */; };
+		FA5881E4AF863D54EA5C02A6 /* ActivityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE7ED869E2FB562761102E7E /* ActivityMonitor.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D2E5289C83BD5886C7FC6448 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 38921F5934617BDAEC0B4568 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8FC2CF6A1F4A57865989BDCF;
+			remoteInfo = MicGuard;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		026BA6A21433C1568EAAE69D /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
+		06CB407C45957F3D1DA3B1A1 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = UserNotifications.framework; sourceTree = "<group>"; };
+		15468AA3DBB5B0D57A889119 /* OutputDeviceSubmenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputDeviceSubmenuBuilder.swift; sourceTree = "<group>"; };
+		19207A383ED9BB3AFBE2E7FF /* DeviceSubmenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSubmenuBuilder.swift; sourceTree = "<group>"; };
+		1B7A3A1BF72AF0757AFF199D /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = CoreAudio.framework; sourceTree = "<group>"; };
+		23563E142FC69EE67428040D /* VolumeGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeGuardTests.swift; sourceTree = "<group>"; };
+		27BE9DA3D097A383FD554197 /* AudioDeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceManager.swift; sourceTree = "<group>"; };
+		2E6D040238D0366F8D854022 /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = ServiceManagement.framework; sourceTree = "<group>"; };
+		2F63A1260DED312BCCD8C589 /* StatsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsManager.swift; sourceTree = "<group>"; };
+		41D627FD83CCD96352B8EC3C /* OnAirSnoozeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnAirSnoozeManager.swift; sourceTree = "<group>"; };
+		48A2E83C7C0A1552B059E390 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
+		4D855FFC6A0E3F07DF4B3338 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicGuardApp.swift; sourceTree = "<group>"; };
+		5402F144B596FE9D04B12231 /* DeviceWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWatchdog.swift; sourceTree = "<group>"; };
+		5F9EF3670D38515CF80725F1 /* VolumeGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeGuard.swift; sourceTree = "<group>"; };
+		65D046220518AE607C60266E /* AudioDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceTests.swift; sourceTree = "<group>"; };
+		6D718142792A4F0FFF7A5482 /* OnAirIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnAirIndicator.swift; sourceTree = "<group>"; };
+		824923C92EEC9AB5A32B9B5C /* MenuItemFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuItemFactory.swift; sourceTree = "<group>"; };
+		88F857EAE679C6AA4409D5FE /* PreferencesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManager.swift; sourceTree = "<group>"; };
+		8917135B81208F598CC7F2D2 /* DeviceWatchdogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWatchdogTests.swift; sourceTree = "<group>"; };
+		9090B7CE10EEA47ADDC7F868 /* PreferencesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManagerTests.swift; sourceTree = "<group>"; };
+		951A3423131A20D2D7086FA6 /* OnAirIndicatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnAirIndicatorTests.swift; sourceTree = "<group>"; };
+		9E7F4C0FED52F70576F084DC /* MicGuardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MicGuardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6E55EE43EBEC5B1089E6F35 /* MockAudioDeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAudioDeviceManager.swift; sourceTree = "<group>"; };
+		BE7ED869E2FB562761102E7E /* ActivityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitor.swift; sourceTree = "<group>"; };
+		C09AF8FC8B60E166A64F34C5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C2A0A7A0D04087851FF0A344 /* OutputDeviceWatchdogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputDeviceWatchdogTests.swift; sourceTree = "<group>"; };
+		C83F9EC758C38AC76CB1C831 /* MicGuard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MicGuard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C84A882C8366DD60D8C247ED /* StatsManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsManagerTests.swift; sourceTree = "<group>"; };
+		D14FDE4A4BAB4EA87A74DAF5 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = AppKit.framework; sourceTree = "<group>"; };
+		DB6609B20D47378A5C9AB137 /* ProcessMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitorTests.swift; sourceTree = "<group>"; };
+		DF58486181BD7EAC6339A19D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		ECB2729A791348CF3CD2A9F0 /* ActivityMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitorTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B080671F47A9D4AD5A4FC95B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				817165F01181142654788D33 /* CoreAudio.framework in Frameworks */,
+				4C02C22C3D4E5D9923610D35 /* AppKit.framework in Frameworks */,
+				051150142B067422DA56634F /* UserNotifications.framework in Frameworks */,
+				3F37E64541024A1935A4EE79 /* ServiceManagement.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		14907AA5313C01444377959D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C83F9EC758C38AC76CB1C831 /* MicGuard.app */,
+				9E7F4C0FED52F70576F084DC /* MicGuardTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		38FFAF2263F5E96A9C212BC7 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				BE7ED869E2FB562761102E7E /* ActivityMonitor.swift */,
+				27BE9DA3D097A383FD554197 /* AudioDeviceManager.swift */,
+				5402F144B596FE9D04B12231 /* DeviceWatchdog.swift */,
+				48A2E83C7C0A1552B059E390 /* ProcessMonitor.swift */,
+				5F9EF3670D38515CF80725F1 /* VolumeGuard.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		6CB0F1814549C51ADDF41151 = {
+			isa = PBXGroup;
+			children = (
+				F0A986B4ADC366331E4198FD /* MicGuard */,
+				E07B260D1CF2EA30F7C9C879 /* MicGuardTests */,
+				827B8E0D4A7C084817F9D06A /* Frameworks */,
+				14907AA5313C01444377959D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		827B8E0D4A7C084817F9D06A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D14FDE4A4BAB4EA87A74DAF5 /* AppKit.framework */,
+				1B7A3A1BF72AF0757AFF199D /* CoreAudio.framework */,
+				2E6D040238D0366F8D854022 /* ServiceManagement.framework */,
+				06CB407C45957F3D1DA3B1A1 /* UserNotifications.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8A04B3A00C4251AC5E78BEF5 /* Mocks */ = {
+			isa = PBXGroup;
+			children = (
+				A6E55EE43EBEC5B1089E6F35 /* MockAudioDeviceManager.swift */,
+			);
+			path = Mocks;
+			sourceTree = "<group>";
+		};
+		CABD03957694A4946745C2E9 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				DF58486181BD7EAC6339A19D /* AppDelegate.swift */,
+				C09AF8FC8B60E166A64F34C5 /* Info.plist */,
+				50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		D656CF54723DABC7D76B255A /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				19207A383ED9BB3AFBE2E7FF /* DeviceSubmenuBuilder.swift */,
+				824923C92EEC9AB5A32B9B5C /* MenuItemFactory.swift */,
+				6D718142792A4F0FFF7A5482 /* OnAirIndicator.swift */,
+				41D627FD83CCD96352B8EC3C /* OnAirSnoozeManager.swift */,
+				15468AA3DBB5B0D57A889119 /* OutputDeviceSubmenuBuilder.swift */,
+				026BA6A21433C1568EAAE69D /* StatusBarController.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		E07B260D1CF2EA30F7C9C879 /* MicGuardTests */ = {
+			isa = PBXGroup;
+			children = (
+				ECB2729A791348CF3CD2A9F0 /* ActivityMonitorTests.swift */,
+				65D046220518AE607C60266E /* AudioDeviceTests.swift */,
+				8917135B81208F598CC7F2D2 /* DeviceWatchdogTests.swift */,
+				8A04B3A00C4251AC5E78BEF5 /* Mocks */,
+				951A3423131A20D2D7086FA6 /* OnAirIndicatorTests.swift */,
+				C2A0A7A0D04087851FF0A344 /* OutputDeviceWatchdogTests.swift */,
+				9090B7CE10EEA47ADDC7F868 /* PreferencesManagerTests.swift */,
+				DB6609B20D47378A5C9AB137 /* ProcessMonitorTests.swift */,
+				C84A882C8366DD60D8C247ED /* StatsManagerTests.swift */,
+				23563E142FC69EE67428040D /* VolumeGuardTests.swift */,
+			);
+			path = MicGuardTests;
+			sourceTree = "<group>";
+		};
+		EB5A5A5487D4A33480F27F02 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				4D855FFC6A0E3F07DF4B3338 /* NotificationManager.swift */,
+				88F857EAE679C6AA4409D5FE /* PreferencesManager.swift */,
+				2F63A1260DED312BCCD8C589 /* StatsManager.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		F0A986B4ADC366331E4198FD /* MicGuard */ = {
+			isa = PBXGroup;
+			children = (
+				CABD03957694A4946745C2E9 /* App */,
+				38FFAF2263F5E96A9C212BC7 /* Core */,
+				D656CF54723DABC7D76B255A /* UI */,
+				EB5A5A5487D4A33480F27F02 /* Utilities */,
+			);
+			path = MicGuard;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5310ED433981F5D48CFDA9C9 /* MicGuardTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 820BE00CE20BB454B55573E4 /* Build configuration list for PBXNativeTarget "MicGuardTests" */;
+			buildPhases = (
+				EF22BDAA1F81D5E15D75253D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				483CF5BC52A7BE959F6F47D5 /* PBXTargetDependency */,
+			);
+			name = MicGuardTests;
+			packageProductDependencies = (
+			);
+			productName = MicGuardTests;
+			productReference = 9E7F4C0FED52F70576F084DC /* MicGuardTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		8FC2CF6A1F4A57865989BDCF /* MicGuard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BDDE70D6230FBB4B430CDEA7 /* Build configuration list for PBXNativeTarget "MicGuard" */;
+			buildPhases = (
+				759EE5D8F6DEC1D74F96861E /* Sources */,
+				B080671F47A9D4AD5A4FC95B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MicGuard;
+			packageProductDependencies = (
+			);
+			productName = MicGuard;
+			productReference = C83F9EC758C38AC76CB1C831 /* MicGuard.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		38921F5934617BDAEC0B4568 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					8FC2CF6A1F4A57865989BDCF = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = E929F2A6EAF5A21B212745F5 /* Build configuration list for PBXProject "MicGuard" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 6CB0F1814549C51ADDF41151;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 14907AA5313C01444377959D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8FC2CF6A1F4A57865989BDCF /* MicGuard */,
+				5310ED433981F5D48CFDA9C9 /* MicGuardTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		759EE5D8F6DEC1D74F96861E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA5881E4AF863D54EA5C02A6 /* ActivityMonitor.swift in Sources */,
+				377FBE04435A4F710B7C8664 /* AppDelegate.swift in Sources */,
+				2B6FFA37D11AE09E9F5211D5 /* AudioDeviceManager.swift in Sources */,
+				2822A8D38A715FC16A6B03DA /* DeviceSubmenuBuilder.swift in Sources */,
+				5F60D898A14EC0DF001E973C /* DeviceWatchdog.swift in Sources */,
+				913BFEB4FF0DA78F904D504E /* MenuItemFactory.swift in Sources */,
+				4AA2A2771ED2D157DF8A307F /* MicGuardApp.swift in Sources */,
+				EEDA6E1DD2C97227F4AA7CAE /* NotificationManager.swift in Sources */,
+				61EF87980C7292C453E3A064 /* OnAirIndicator.swift in Sources */,
+				9F3EE843A46A8B606A5978A0 /* OnAirSnoozeManager.swift in Sources */,
+				8418F866A545D7CEE0A46464 /* OutputDeviceSubmenuBuilder.swift in Sources */,
+				B524CE1CCCEF19FC50FECBCD /* PreferencesManager.swift in Sources */,
+				17F6FDB26D51ECBCA88E5800 /* ProcessMonitor.swift in Sources */,
+				9474CDD3F6E89ECC9B65952B /* StatsManager.swift in Sources */,
+				2D0C28F08E4E2189671AF32A /* StatusBarController.swift in Sources */,
+				82254C399AFF14A7FB1CE54E /* VolumeGuard.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF22BDAA1F81D5E15D75253D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				691F0F8CF3CF250C20D1D8BA /* ActivityMonitorTests.swift in Sources */,
+				B0DDF29FF18699A8A714BAFB /* AudioDeviceTests.swift in Sources */,
+				F7ED92E2EF2D164363C12996 /* DeviceWatchdogTests.swift in Sources */,
+				9F6741B73A45F8B78A24F4DA /* MockAudioDeviceManager.swift in Sources */,
+				D20E393BF9E5E9BA03FF7B5B /* OnAirIndicatorTests.swift in Sources */,
+				252B26D576F0AF1359C11D97 /* OutputDeviceWatchdogTests.swift in Sources */,
+				07F9667ACC9964EC414E201B /* PreferencesManagerTests.swift in Sources */,
+				82C66B9309DF87F1F906B6EE /* ProcessMonitorTests.swift in Sources */,
+				7C7AA92E2629894DE14D2784 /* StatsManagerTests.swift in Sources */,
+				65044E594F00C21CBEC1716D /* VolumeGuardTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		483CF5BC52A7BE959F6F47D5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8FC2CF6A1F4A57865989BDCF /* MicGuard */;
+			targetProxy = D2E5289C83BD5886C7FC6448 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1D40ECDF93CF0091286CD74F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		5E9BA94EDB44DD5145E94289 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.micguard.app.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MicGuard.app/Contents/MacOS/MicGuard";
+			};
+			name = Debug;
+		};
+		8B48CEDC31FAE8379CCD73C5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		9B78E276073FFF3FD0E2E012 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = MQXW376WC6;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MicGuard/App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LS_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.micguard.app;
+				PRODUCT_NAME = MicGuard;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		A4A1860F28FCFD5FC31E98EB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = MQXW376WC6;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MicGuard/App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LS_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.micguard.app;
+				PRODUCT_NAME = MicGuard;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		B5074ED2D61812DCEB628168 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.micguard.app.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MicGuard.app/Contents/MacOS/MicGuard";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		820BE00CE20BB454B55573E4 /* Build configuration list for PBXNativeTarget "MicGuardTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E9BA94EDB44DD5145E94289 /* Debug */,
+				B5074ED2D61812DCEB628168 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BDDE70D6230FBB4B430CDEA7 /* Build configuration list for PBXNativeTarget "MicGuard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9B78E276073FFF3FD0E2E012 /* Debug */,
+				A4A1860F28FCFD5FC31E98EB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E929F2A6EAF5A21B212745F5 /* Build configuration list for PBXProject "MicGuard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B48CEDC31FAE8379CCD73C5 /* Debug */,
+				1D40ECDF93CF0091286CD74F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 38921F5934617BDAEC0B4568 /* Project object */;
+}
