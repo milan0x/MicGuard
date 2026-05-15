@@ -264,8 +264,6 @@ final class DeviceWatchdogTests: XCTestCase {
         let hijackDevice = mockAudioManager.inputDevices.first { $0.uid == "AirPodsPro" }!
 
         mockAudioManager.setDefaultInputDevice(preferredDevice)
-        mockAudioManager.shouldFailSetDevice = true
-
         watchdog.startWatching(devicePriorityOrder: [preferredDevice.uid])
 
         var hijackBlocked = false
@@ -273,11 +271,11 @@ final class DeviceWatchdogTests: XCTestCase {
             hijackBlocked = true
         }
 
-        mockAudioManager.shouldFailSetDevice = false
-        mockAudioManager.simulateDeviceSwitch(to: hijackDevice)
+        // Fail the device set before the hijack event so enforcement can't succeed.
         mockAudioManager.shouldFailSetDevice = true
+        mockAudioManager.simulateDeviceSwitch(to: hijackDevice)
 
-        let expectation = XCTestExpectation(description: "Wait for debounce")
+        let expectation = XCTestExpectation(description: "Wait for enforcement")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             expectation.fulfill()
         }

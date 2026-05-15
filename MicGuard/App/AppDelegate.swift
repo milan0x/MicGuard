@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - App Lifecycle
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("[MicGuard.App] === BUILD MARKER 2026-05-15-diag1 — launching ===")
         // Initialize core audio manager
         audioDeviceManager = AudioDeviceManager()
         
@@ -171,13 +172,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func applyStoredPreferences() {
+        NSLog("[MicGuard.App] applyStoredPreferences: lockEnabled=\(preferencesManager.inputDeviceLockEnabled) priority=\(preferencesManager.preferredInputDeviceOrder)")
         // Apply input device lock if enabled
         if preferencesManager.inputDeviceLockEnabled {
             let priorityOrder = preferencesManager.preferredInputDeviceOrder
             if !priorityOrder.isEmpty {
                 deviceWatchdog?.startWatching(devicePriorityOrder: priorityOrder)
+            } else {
+                NSLog("[MicGuard.App] applyStoredPreferences: lock enabled but priority is empty — watchdog NOT started")
             }
+        } else {
+            NSLog("[MicGuard.App] applyStoredPreferences: lock is DISABLED — watchdog NOT started")
         }
+        updateActivityMonitorDeviceOverride()
 
         // Apply output device lock if enabled
         if preferencesManager.outputDeviceLockEnabled {
@@ -243,6 +250,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.deviceWatchdog?.startWatching(devicePriorityOrder: priorityOrder)
                 }
             }
+            self.updateActivityMonitorDeviceOverride()
         }
 
         NotificationCenter.default.addObserver(
@@ -298,6 +306,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController?.flashOnAirIndicator()
     }
 
+    /// Tells ActivityMonitor which device to treat as the "in use" source for the On Air indicator.
+    /// When the input lock is active, we track the locked device directly so the indicator stays
+    /// correct even if macOS briefly switches the system default to AirPods.
+    private func updateActivityMonitorDeviceOverride() {
+        guard preferencesManager.inputDeviceLockEnabled else {
+            activityMonitor?.overrideMonitoredDevice = nil
+            NSLog("[MicGuard.App] override cleared (lock disabled)")
+            return
+        }
+        let priorityOrder = preferencesManager.preferredInputDeviceOrder
+        for uid in priorityOrder {
+            if let device = audioDeviceManager?.device(forUID: uid), device.isInput {
+                activityMonitor?.overrideMonitoredDevice = device
+                NSLog("[MicGuard.App] override set to \(device.name)")
+                return
+            }
+            if let name = preferencesManager.cachedDeviceName(for: uid),
+               let device = audioDeviceManager?.inputDevices(withName: name).first {
+                activityMonitor?.overrideMonitoredDevice = device
+                NSLog("[MicGuard.App] override set to \(device.name) (name-matched)")
+                return
+            }
+        }
+        activityMonitor?.overrideMonitoredDevice = nil
+        NSLog("[MicGuard.App] override cleared (no preferred device available)")
+    }
+
     private func handlePreferenceChange(key: String) {
         // Handle Target Volume Change
         if key == "TargetVolume" {
@@ -324,6 +359,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 deviceWatchdog?.stopWatching()
             }
+            updateActivityMonitorDeviceOverride()
         }
 
         // Handle Output Device Lock Toggle

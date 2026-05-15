@@ -42,6 +42,10 @@ class ActivityMonitor: ActivityMonitorProtocol {
     private(set) var isMicrophoneInUse: Bool = false
     private(set) var currentInputLevel: Float = 0.0
     private(set) var currentMicUsageType: MicUsageType = .none
+
+    /// When the input device lock is active, monitor this device instead of the system default.
+    /// Prevents On Air indicator from disappearing when macOS briefly switches to AirPods.
+    var overrideMonitoredDevice: AudioDevice?
     
     // Audio level tracking
     private var pollingTimer: Timer?
@@ -98,6 +102,15 @@ class ActivityMonitor: ActivityMonitorProtocol {
             }
             .store(in: &cancellables)
 
+        // Re-poll whenever the system default input changes so we immediately
+        // re-check the locked/preferred device rather than waiting up to 5s.
+        audioDeviceManager.defaultInputChangedPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.pollInputLevel()
+            }
+            .store(in: &cancellables)
+
         // Start polling timer as fallback
         pollingTimer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in
             self?.pollInputLevel()
@@ -120,7 +133,7 @@ class ActivityMonitor: ActivityMonitorProtocol {
     
     private func pollInputLevel() {
         guard isMonitoring,
-              let device = audioDeviceManager.defaultInputDevice else {
+              let device = overrideMonitoredDevice ?? audioDeviceManager.defaultInputDevice else {
             currentInputLevel = 0.0
             inputLevelPublisher.send(0.0)
             if isMicrophoneInUse {
@@ -134,6 +147,7 @@ class ActivityMonitor: ActivityMonitorProtocol {
         let isRunning = audioDeviceManager.isDeviceRunning(device)
 
         if isRunning != isMicrophoneInUse {
+            NSLog("[MicGuard.Activity] pollInputLevel polled=\(device.name) override=\(overrideMonitoredDevice?.name ?? "nil") systemDefault=\(audioDeviceManager.defaultInputDevice?.name ?? "nil") isRunning=\(isRunning) (was \(isMicrophoneInUse))")
             isMicrophoneInUse = isRunning
             micInUsePublisher.send(isRunning)
         }

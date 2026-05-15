@@ -371,6 +371,7 @@ class StatusBarController {
             .sink { [weak self] _ in
                 self?.updateStatusDisplay()
                 self?.updateInputDeviceMenuItemTitle()
+                self?.updateInputDeviceSubmenu()
             }
             .store(in: &cancellables)
 
@@ -379,6 +380,17 @@ class StatusBarController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateStatusDisplay()
+                self?.updateInputDeviceMenuItemTitle()
+                self?.updateInputDeviceSubmenu()
+            }
+            .store(in: &cancellables)
+
+        // Also rebuild the submenu when the device list changes, so newly-connected devices
+        // appear immediately rather than only after the next default-change event.
+        audioDeviceManager.devicesChangedPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.updateInputDeviceSubmenu()
                 self?.updateInputDeviceMenuItemTitle()
             }
             .store(in: &cancellables)
@@ -437,10 +449,9 @@ class StatusBarController {
     // MARK: - Menu Updates
 
     private func currentDisplayDevice() -> AudioDevice? {
-        if let preferredUID = preferencesManager.preferredInputDeviceUID,
-           let device = audioDeviceManager.device(forUID: preferredUID) {
-            return device
-        }
+        // Show the actual active system default so the status reflects reality.
+        // If we showed the preferred device instead, a failed lock would be hidden behind a
+        // status line that disagrees with the submenu's checkmark.
         return audioDeviceManager.defaultInputDevice
     }
 
@@ -497,12 +508,10 @@ class StatusBarController {
     }
 
     private func updateInputDeviceMenuItemTitle() {
-        let preferredUID = preferencesManager.preferredInputDeviceUID
-
-        if let uid = preferredUID,
-           let device = audioDeviceManager.device(forUID: uid) {
-            inputDeviceMenuItem?.title = "    Device: \(device.name)"
-        } else if let defaultDevice = audioDeviceManager.defaultInputDevice {
+        // Show the actual active device so this stays consistent with the submenu's checkmark
+        // and the top status line. Previously this showed the preferred device, which hid
+        // lock failures behind a name that didn't match reality.
+        if let defaultDevice = audioDeviceManager.defaultInputDevice {
             inputDeviceMenuItem?.title = "    Device: \(defaultDevice.name)"
         } else {
             inputDeviceMenuItem?.title = "    Select Device"
@@ -538,8 +547,8 @@ class StatusBarController {
         let isEnabled = sender.state == .off
         sender.state = isEnabled ? .on : .off
 
-        var prefs = preferencesManager
-        prefs.inputDeviceLockEnabled = isEnabled
+        preferencesManager.inputDeviceLockEnabled = isEnabled
+        NSLog("[MicGuard.UI] toggleInputDeviceLock: wrote \(isEnabled), readback=\(preferencesManager.inputDeviceLockEnabled)")
 
         NotificationCenter.default.post(name: .inputDeviceLockChanged, object: nil)
     }
@@ -553,8 +562,7 @@ class StatusBarController {
         default: return
         }
 
-        var prefs = preferencesManager
-        prefs.volumeControlStrategy = strategy
+        preferencesManager.volumeControlStrategy = strategy
 
         setupMenu()
     }
@@ -563,24 +571,21 @@ class StatusBarController {
         let isEnabled = sender.state == .off
         sender.state = isEnabled ? .on : .off
 
-        var prefs = preferencesManager
-        prefs.launchAtLogin = isEnabled
+        preferencesManager.launchAtLogin = isEnabled
     }
 
     @objc private func toggleNotifications(_ sender: NSMenuItem) {
         let isEnabled = sender.state == .off
         sender.state = isEnabled ? .on : .off
 
-        var prefs = preferencesManager
-        prefs.showNotifications = isEnabled
+        preferencesManager.showNotifications = isEnabled
     }
 
     @objc private func toggleOnAirIndicator(_ sender: NSMenuItem) {
         let isEnabled = sender.state == .off
         sender.state = isEnabled ? .on : .off
 
-        var prefs = preferencesManager
-        prefs.showOnAirIndicator = isEnabled
+        preferencesManager.showOnAirIndicator = isEnabled
 
         if !isEnabled {
             snoozeManager?.cancelSnooze()
@@ -606,8 +611,7 @@ class StatusBarController {
         let isEnabled = sender.state == .off
         sender.state = isEnabled ? .on : .off
 
-        var prefs = preferencesManager
-        prefs.showStats = isEnabled
+        preferencesManager.showStats = isEnabled
 
         guard let menu = menu else { return }
 
@@ -698,8 +702,7 @@ class StatusBarController {
         let isEnabled = sender.state == .off
         sender.state = isEnabled ? .on : .off
 
-        var prefs = preferencesManager
-        prefs.outputDeviceLockEnabled = isEnabled
+        preferencesManager.outputDeviceLockEnabled = isEnabled
 
         NotificationCenter.default.post(name: .outputDeviceLockChanged, object: nil)
     }
@@ -708,8 +711,7 @@ class StatusBarController {
         let isEnabled = sender.state == .off
         sender.state = isEnabled ? .on : .off
 
-        var prefs = preferencesManager
-        prefs.outputAutoSwitchEnabled = isEnabled
+        preferencesManager.outputAutoSwitchEnabled = isEnabled
     }
 
     @objc private func moveOutputDeviceUp(_ sender: NSButton) {
@@ -748,8 +750,7 @@ class StatusBarController {
 
         let isMouseUp = NSApp.currentEvent?.type == .leftMouseUp
         if isMouseUp {
-            var prefs = preferencesManager
-            prefs.targetVolume = value
+            preferencesManager.targetVolume = value
         }
     }
 

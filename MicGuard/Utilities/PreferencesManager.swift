@@ -29,7 +29,7 @@ enum VolumeControlStrategy: String, CaseIterable {
 
 // MARK: - Protocol for Testability
 
-protocol PreferencesManaging {
+protocol PreferencesManaging: AnyObject {
     // Input Device Preferences
     var preferredInputDeviceUID: String? { get set }
     var preferredInputDeviceOrder: [String] { get set }
