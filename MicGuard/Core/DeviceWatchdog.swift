@@ -58,6 +58,12 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     private var pauseTimer: DispatchWorkItem?
     private var appDeactivationObserver: NSObjectProtocol?
 
+    // Periodic verification: macOS (especially Bluetooth/AirPods routing) can switch the default
+    // device without reliably firing kAudioHardwarePropertyDefaultInputDevice. Poll every 3s as
+    // a safety net so the lock catches any switch that slips past the event-driven path.
+    private var verificationTimer: Timer?
+    private let verificationInterval: TimeInterval = 3.0
+
     var onDeviceHijackBlocked: ((String, String) -> Void)?
     var nameForUID: ((String) -> String?)?
     var onDeviceUIDUpdated: ((String, String) -> Void)?
@@ -87,7 +93,12 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
         self.devicePriorityOrder = devicePriorityOrder
         self.preferredDeviceUID = devicePriorityOrder.first
 
-        guard !isWatching else { return }
+        NSLog("[MicGuard.Watchdog] startWatching priority=\(devicePriorityOrder)")
+
+        guard !isWatching else {
+            NSLog("[MicGuard.Watchdog] startWatching: already watching, only priority updated")
+            return
+        }
         isWatching = true
 
         deviceChangedPublisher()
@@ -103,6 +114,7 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
             .store(in: &cancellables)
 
         enforcePreferredDevice()
+        startVerificationTimer()
     }
 
     func stopWatching() {
@@ -111,6 +123,7 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
         cancellables.removeAll()
         debounceWorkItem?.cancel()
         debounceWorkItem = nil
+        stopVerificationTimer()
     }
 
     func updatePreferredDevice(uid: String) {
@@ -129,10 +142,13 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     // MARK: - Device Change Handling
 
     private func handleDeviceChange(newDevice: AudioDevice?) {
+        NSLog("[MicGuard.Watchdog] handleDeviceChange newDevice=\(newDevice?.name ?? "nil") isWatching=\(isWatching) isPaused=\(isPaused)")
+
         guard isWatching else { return }
 
         // If user is manually changing device in System Settings, pause enforcement
         if isSystemSettingsFrontmost() {
+            NSLog("[MicGuard.Watchdog] handleDeviceChange: System Settings frontmost, pausing")
             startPause()
             return
         }
@@ -142,27 +158,24 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
             resumeFromPause()
         }
 
-        guard let bestDevice = selectBestDevice() else { return }
+        guard let bestDevice = selectBestDevice() else {
+            NSLog("[MicGuard.Watchdog] handleDeviceChange: selectBestDevice returned nil — priority=\(devicePriorityOrder)")
+            return
+        }
 
+        NSLog("[MicGuard.Watchdog] handleDeviceChange bestDevice=\(bestDevice.name) priorityOrder=\(devicePriorityOrder)")
+
+        // Enforce immediately when the new default isn't our preferred device.
+        // Previously this was debounced, but each rapid-fire macOS event (AirPods HFP/AAC
+        // mode switches, re-overrides) would cancel the pending work item and reschedule —
+        // starving enforcement when events arrived faster than the debounce interval.
         if newDevice?.uid != bestDevice.uid {
-            debounceWorkItem?.cancel()
-
-            let workItem = DispatchWorkItem { [weak self] in
-                guard let self = self else { return }
-                guard let bestDevice = self.selectBestDevice() else { return }
-                let currentDefault = self.getDefaultDevice()
-
-                if currentDefault?.uid != bestDevice.uid {
-                    self.enforcePreferredDevice()
-                }
-            }
-
-            debounceWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
+            enforcePreferredDevice()
         }
     }
 
     func handleDeviceListChange() {
+        NSLog("[MicGuard.Watchdog] handleDeviceListChange isWatching=\(isWatching)")
         guard isWatching else { return }
 
         // A device list change (connect/disconnect) while paused resumes enforcement
@@ -172,24 +185,100 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
 
         if let bestDevice = selectBestDevice() {
             let currentDefault = getDefaultDevice()
+            NSLog("[MicGuard.Watchdog] handleDeviceListChange best=\(bestDevice.name) current=\(currentDefault?.name ?? "nil")")
             if currentDefault?.uid != bestDevice.uid {
                 enforcePreferredDevice()
             }
         }
+
+        // macOS often changes the default device *after* the device-list change event fires
+        // (observed with AirPods and other Bluetooth devices). Schedule two delayed checks so
+        // we catch the switch even when kAudioHardwarePropertyDefaultInputDevice doesn't fire.
+        scheduleDelayedCheck(after: 0.3)
+        scheduleDelayedCheck(after: 1.0)
+    }
+
+    private func scheduleDelayedCheck(after delay: TimeInterval) {
+        // One-shot timer in .common mode so it fires even while NSMenu is tracking.
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self = self, self.isWatching, !self.isPaused else { return }
+            guard let bestDevice = self.selectBestDevice() else { return }
+            let currentDefault = self.getDefaultDevice()
+            if currentDefault?.uid != bestDevice.uid {
+                self.enforcePreferredDevice()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     func enforcePreferredDevice() {
-        guard !isPaused else { return }
-        guard let bestDevice = selectBestDevice() else { return }
+        guard !isPaused else {
+            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: paused, skipping")
+            return
+        }
+        guard let bestDevice = selectBestDevice() else {
+            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: no best device, skipping")
+            return
+        }
 
         let currentDefault = getDefaultDevice()
-        guard currentDefault?.uid != bestDevice.uid else { return }
+        guard currentDefault?.uid != bestDevice.uid else {
+            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: already on \(bestDevice.name), nothing to do")
+            return
+        }
 
         let attemptedDeviceName = currentDefault?.name ?? "Unknown"
+        NSLog("[MicGuard.Watchdog] enforcePreferredDevice: switching from \(attemptedDeviceName) to \(bestDevice.name)")
 
-        if setDefaultDevice(bestDevice) {
+        let setResult = setDefaultDevice(bestDevice)
+        NSLog("[MicGuard.Watchdog] enforcePreferredDevice: setDefaultDevice returned \(setResult)")
+
+        if setResult {
+            // Verify immediately whether the change actually stuck at the CoreAudio layer.
+            let verifyDefault = getDefaultDevice()
+            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: post-set verification, currentDefault=\(verifyDefault?.name ?? "nil")")
+
             onDeviceHijackBlocked?(attemptedDeviceName, bestDevice.name)
+            // macOS (especially with AirPods) can re-override within milliseconds.
+            // Verify the change stuck after a short delay and silently re-apply if needed.
+            scheduleEnforcementVerification()
         }
+    }
+
+    private func scheduleEnforcementVerification() {
+        let timer = Timer(timeInterval: 0.4, repeats: false) { [weak self] _ in
+            guard let self = self, self.isWatching, !self.isPaused else { return }
+            guard let bestDevice = self.selectBestDevice() else { return }
+            let currentDefault = self.getDefaultDevice()
+            if currentDefault?.uid != bestDevice.uid {
+                _ = self.setDefaultDevice(bestDevice)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func startVerificationTimer() {
+        stopVerificationTimer()
+        // Use .common mode so the timer fires even while NSMenu's eventTracking loop is active.
+        // Timer.scheduledTimer uses .defaultRunLoopMode which is suspended during menu display.
+        let timer = Timer(timeInterval: verificationInterval, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            guard self.isWatching, !self.isPaused else { return }
+            guard let bestDevice = self.selectBestDevice() else { return }
+            let currentDefault = self.getDefaultDevice()
+            if currentDefault?.uid != bestDevice.uid {
+                NSLog("[MicGuard.Watchdog] verificationTimer: drift detected, current=\(currentDefault?.name ?? "nil") best=\(bestDevice.name)")
+                self.enforcePreferredDevice()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        verificationTimer = timer
+        NSLog("[MicGuard.Watchdog] verificationTimer started (\(verificationInterval)s interval, .common mode)")
+    }
+
+    private func stopVerificationTimer() {
+        verificationTimer?.invalidate()
+        verificationTimer = nil
     }
 
     // MARK: - Manual Change Pause

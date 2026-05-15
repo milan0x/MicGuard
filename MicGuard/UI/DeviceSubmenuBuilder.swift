@@ -218,13 +218,12 @@ class DeviceSubmenuBuilder {
         let uid = priorityOrder[index]
         guard let device = audioDeviceManager.device(forUID: uid) else { return }
 
-        _ = audioDeviceManager.setDefaultInputDevice(device)
+        audioDeviceManager.setDefaultInputDevice(device)
 
-        var prefs = preferencesManager
-        prefs.preferredInputDeviceUID = uid
+        preferencesManager.preferredInputDeviceUID = uid
 
         if index > 0 {
-            prefs.moveDevice(uid: uid, direction: .toTop)
+            preferencesManager.moveDevice(uid: uid, direction: .toTop)
         }
 
         NotificationCenter.default.post(name: .preferredInputDeviceChanged, object: uid)
@@ -235,22 +234,20 @@ class DeviceSubmenuBuilder {
         guard index >= 0, index < priorityOrder.count else { return }
 
         let uid = priorityOrder[index]
-        var prefs = preferencesManager
-        prefs.removeDeviceFromOrder(uid)
+        preferencesManager.removeDeviceFromOrder(uid)
 
         if preferencesManager.preferredInputDeviceUID == uid {
-            prefs.preferredInputDeviceUID = nil
+            preferencesManager.preferredInputDeviceUID = nil
         }
 
         NotificationCenter.default.post(name: .preferredInputDeviceChanged, object: uid)
     }
 
     func selectDevice(uid: String) {
-        var prefs = preferencesManager
-        prefs.preferredInputDeviceUID = uid
+        preferencesManager.preferredInputDeviceUID = uid
 
-        if !prefs.preferredInputDeviceOrder.contains(uid) {
-            prefs.addDeviceToOrder(uid)
+        if !preferencesManager.preferredInputDeviceOrder.contains(uid) {
+            preferencesManager.addDeviceToOrder(uid)
         }
 
         NotificationCenter.default.post(name: .preferredInputDeviceChanged, object: uid)

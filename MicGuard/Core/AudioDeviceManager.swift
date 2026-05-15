@@ -36,7 +36,9 @@ protocol AudioDeviceManaging {
     var defaultInputDevice: AudioDevice? { get }
     var defaultOutputDevice: AudioDevice? { get }
     
+    @discardableResult
     func setDefaultInputDevice(_ device: AudioDevice) -> Bool
+    @discardableResult
     func setDefaultOutputDevice(_ device: AudioDevice) -> Bool
     func getInputVolume(for device: AudioDevice) -> Float?
     func setInputVolume(_ volume: Float, for device: AudioDevice) -> Bool
@@ -517,6 +519,7 @@ class AudioDeviceManager: AudioDeviceManaging {
         
         deviceListListenerBlock = { [weak self] (_, _) in
             DispatchQueue.main.async {
+                NSLog("[MicGuard.CoreAudio] kAudioHardwarePropertyDevices fired")
                 self?.refreshDeviceList()
                 self?.devicesChangedPublisher.send()
             }
@@ -538,7 +541,9 @@ class AudioDeviceManager: AudioDeviceManaging {
         
         defaultInputListenerBlock = { [weak self] (_, _) in
             DispatchQueue.main.async {
-                self?.defaultInputChangedPublisher.send(self?.defaultInputDevice)
+                let dev = self?.defaultInputDevice
+                NSLog("[MicGuard.CoreAudio] kAudioHardwarePropertyDefaultInputDevice fired → \(dev?.name ?? "nil")")
+                self?.defaultInputChangedPublisher.send(dev)
                 // Re-register running state listener on the new default input device
                 if let deviceID = self?.getDefaultDeviceID(isInput: true) {
                     self?.registerInputRunningListener(deviceID: deviceID)
