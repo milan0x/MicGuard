@@ -24,6 +24,8 @@ class StatusBarController {
 
     // Menu item references for dynamic updates
     private var statusMenuItem: NSMenuItem?
+    private var lockStatusMenuItem: NSMenuItem?
+    private var lockToggleMenuItem: NSMenuItem?
     private var inputDeviceMenuItem: NSMenuItem?
     private var inputDeviceSubmenu: NSMenu?
     private var outputDeviceMenuItem: NSMenuItem?
@@ -75,15 +77,21 @@ class StatusBarController {
         statusMenuItem?.isEnabled = false
         menu?.addItem(statusMenuItem!)
 
+        // Lock status line — always visible so the user can tell at a glance whether
+        // MicGuard is actively protecting the input device. Disabled (informational only).
+        lockStatusMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        lockStatusMenuItem?.isEnabled = false
+        menu?.addItem(lockStatusMenuItem!)
+
         menu?.addItem(NSMenuItem.separator())
 
         // Input Settings Section
         let inputHeader = MenuItemFactory.createSectionHeader(title: "Input Settings")
         menu?.addItem(inputHeader)
 
-        // Lock Input Device
+        // Lock Input Device toggle — title reflects state so the action is obvious.
         let lockInputItem = NSMenuItem(
-            title: "Lock Input Device",
+            title: "",
             action: #selector(toggleInputDeviceLock),
             keyEquivalent: ""
         )
@@ -91,6 +99,9 @@ class StatusBarController {
         lockInputItem.state = preferencesManager.inputDeviceLockEnabled ? .on : .off
         lockInputItem.tag = 100
         menu?.addItem(lockInputItem)
+        lockToggleMenuItem = lockInputItem
+        updateLockToggleTitle()
+        updateLockStatusDisplay()
 
         // Input device submenu
         inputDeviceMenuItem = NSMenuItem(title: "    Select Device", action: nil, keyEquivalent: "")
@@ -372,6 +383,7 @@ class StatusBarController {
                 self?.updateStatusDisplay()
                 self?.updateInputDeviceMenuItemTitle()
                 self?.updateInputDeviceSubmenu()
+                self?.updateLockStatusDisplay()
             }
             .store(in: &cancellables)
 
@@ -382,6 +394,7 @@ class StatusBarController {
                 self?.updateStatusDisplay()
                 self?.updateInputDeviceMenuItemTitle()
                 self?.updateInputDeviceSubmenu()
+                self?.updateLockStatusDisplay()
             }
             .store(in: &cancellables)
 
@@ -392,6 +405,7 @@ class StatusBarController {
             .sink { [weak self] in
                 self?.updateInputDeviceSubmenu()
                 self?.updateInputDeviceMenuItemTitle()
+                self?.updateLockStatusDisplay()
             }
             .store(in: &cancellables)
 
@@ -518,6 +532,39 @@ class StatusBarController {
         }
     }
 
+    private func updateLockStatusDisplay() {
+        guard let item = lockStatusMenuItem else { return }
+        if preferencesManager.inputDeviceLockEnabled {
+            let deviceName = preferredDeviceDisplayName() ?? "preferred device"
+            item.title = "🔒 Locked to \(deviceName)"
+        } else {
+            item.title = "🔓 No lock — devices may auto-switch"
+        }
+    }
+
+    private func updateLockToggleTitle() {
+        guard let item = lockToggleMenuItem else { return }
+        if preferencesManager.inputDeviceLockEnabled {
+            item.title = "🔒 Lock ON"
+        } else {
+            item.title = "⚠️ Lock OFF — Click to Enable"
+        }
+    }
+
+    /// First available device in the priority list (or its cached name if disconnected).
+    /// Used in the lock status line so the user sees what the lock is protecting.
+    private func preferredDeviceDisplayName() -> String? {
+        for uid in preferencesManager.preferredInputDeviceOrder {
+            if let device = audioDeviceManager.device(forUID: uid) {
+                return device.name
+            }
+            if let name = preferencesManager.cachedDeviceName(for: uid) {
+                return name
+            }
+        }
+        return nil
+    }
+
     private func updateStatsDisplay(for stat: StatType) {
         guard let index = StatType.allCases.firstIndex(of: stat),
               index < statsMenuItems.count else { return }
@@ -549,6 +596,9 @@ class StatusBarController {
 
         preferencesManager.inputDeviceLockEnabled = isEnabled
         NSLog("[MicGuard.UI] toggleInputDeviceLock: wrote \(isEnabled), readback=\(preferencesManager.inputDeviceLockEnabled)")
+
+        updateLockToggleTitle()
+        updateLockStatusDisplay()
 
         NotificationCenter.default.post(name: .inputDeviceLockChanged, object: nil)
     }
