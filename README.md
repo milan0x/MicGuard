@@ -6,6 +6,8 @@ Also handles volume - conference apps like Zoom and Meet mess with your mic volu
 
 Vibe-coded macOS menu bar app. Swift, no external dependencies, no network access.
 
+![MicGuard menu bar UI](ss1.png)
+
 ## Features
 
 - Lock preferred input/output device
@@ -26,7 +28,7 @@ swift build
 
 ## Privacy
 
-Nothing leaves your machine. No analytics, no mic access.
+Nothing leaves your machine. No analytics, no mic access — MicGuard uses CoreAudio device metadata only, so macOS never prompts for microphone permission.
 
 ## License
 
