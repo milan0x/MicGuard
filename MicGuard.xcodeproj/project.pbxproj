@@ -10,26 +10,26 @@
 		051150142B067422DA56634F /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 06CB407C45957F3D1DA3B1A1 /* UserNotifications.framework */; };
 		07F9667ACC9964EC414E201B /* PreferencesManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9090B7CE10EEA47ADDC7F868 /* PreferencesManagerTests.swift */; };
 		17F6FDB26D51ECBCA88E5800 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48A2E83C7C0A1552B059E390 /* ProcessMonitor.swift */; };
+		2021B0AF5767E6BF4E625390 /* MGLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F0CAF67D77E5A753CD26A0 /* MGLog.swift */; };
 		252B26D576F0AF1359C11D97 /* OutputDeviceWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0A7A0D04087851FF0A344 /* OutputDeviceWatchdogTests.swift */; };
-		2822A8D38A715FC16A6B03DA /* DeviceSubmenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19207A383ED9BB3AFBE2E7FF /* DeviceSubmenuBuilder.swift */; };
 		2B6FFA37D11AE09E9F5211D5 /* AudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27BE9DA3D097A383FD554197 /* AudioDeviceManager.swift */; };
 		2D0C28F08E4E2189671AF32A /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026BA6A21433C1568EAAE69D /* StatusBarController.swift */; };
 		377FBE04435A4F710B7C8664 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF58486181BD7EAC6339A19D /* AppDelegate.swift */; };
 		3F37E64541024A1935A4EE79 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E6D040238D0366F8D854022 /* ServiceManagement.framework */; };
+		4A788FB92EC420295BCD1913 /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A53A63F92F43E8D9A9A49D /* PopoverContentView.swift */; };
 		4AA2A2771ED2D157DF8A307F /* MicGuardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */; };
 		4C02C22C3D4E5D9923610D35 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D14FDE4A4BAB4EA87A74DAF5 /* AppKit.framework */; };
 		5F60D898A14EC0DF001E973C /* DeviceWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5402F144B596FE9D04B12231 /* DeviceWatchdog.swift */; };
+		60BB5B71AE333E741C4B7E63 /* PopoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5E834163AD279EB488F764 /* PopoverViewModel.swift */; };
 		61EF87980C7292C453E3A064 /* OnAirIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D718142792A4F0FFF7A5482 /* OnAirIndicator.swift */; };
 		65044E594F00C21CBEC1716D /* VolumeGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23563E142FC69EE67428040D /* VolumeGuardTests.swift */; };
 		691F0F8CF3CF250C20D1D8BA /* ActivityMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB2729A791348CF3CD2A9F0 /* ActivityMonitorTests.swift */; };
 		7C7AA92E2629894DE14D2784 /* StatsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C84A882C8366DD60D8C247ED /* StatsManagerTests.swift */; };
+		7DD1F836F15E4352B2D50596 /* DevicePriorityListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A1B6263BD6B2B8700D52D4 /* DevicePriorityListView.swift */; };
 		817165F01181142654788D33 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B7A3A1BF72AF0757AFF199D /* CoreAudio.framework */; };
 		82254C399AFF14A7FB1CE54E /* VolumeGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9EF3670D38515CF80725F1 /* VolumeGuard.swift */; };
 		82C66B9309DF87F1F906B6EE /* ProcessMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6609B20D47378A5C9AB137 /* ProcessMonitorTests.swift */; };
-		8418F866A545D7CEE0A46464 /* OutputDeviceSubmenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15468AA3DBB5B0D57A889119 /* OutputDeviceSubmenuBuilder.swift */; };
-		913BFEB4FF0DA78F904D504E /* MenuItemFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824923C92EEC9AB5A32B9B5C /* MenuItemFactory.swift */; };
 		9474CDD3F6E89ECC9B65952B /* StatsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F63A1260DED312BCCD8C589 /* StatsManager.swift */; };
-		9F3EE843A46A8B606A5978A0 /* OnAirSnoozeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41D627FD83CCD96352B8EC3C /* OnAirSnoozeManager.swift */; };
 		9F6741B73A45F8B78A24F4DA /* MockAudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E55EE43EBEC5B1089E6F35 /* MockAudioDeviceManager.swift */; };
 		B0DDF29FF18699A8A714BAFB /* AudioDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65D046220518AE607C60266E /* AudioDeviceTests.swift */; };
 		B524CE1CCCEF19FC50FECBCD /* PreferencesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F857EAE679C6AA4409D5FE /* PreferencesManager.swift */; };
@@ -52,29 +52,29 @@
 /* Begin PBXFileReference section */
 		026BA6A21433C1568EAAE69D /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		06CB407C45957F3D1DA3B1A1 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = UserNotifications.framework; sourceTree = "<group>"; };
-		15468AA3DBB5B0D57A889119 /* OutputDeviceSubmenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputDeviceSubmenuBuilder.swift; sourceTree = "<group>"; };
-		19207A383ED9BB3AFBE2E7FF /* DeviceSubmenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSubmenuBuilder.swift; sourceTree = "<group>"; };
 		1B7A3A1BF72AF0757AFF199D /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = CoreAudio.framework; sourceTree = "<group>"; };
 		23563E142FC69EE67428040D /* VolumeGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeGuardTests.swift; sourceTree = "<group>"; };
 		27BE9DA3D097A383FD554197 /* AudioDeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceManager.swift; sourceTree = "<group>"; };
 		2E6D040238D0366F8D854022 /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = ServiceManagement.framework; sourceTree = "<group>"; };
 		2F63A1260DED312BCCD8C589 /* StatsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsManager.swift; sourceTree = "<group>"; };
-		41D627FD83CCD96352B8EC3C /* OnAirSnoozeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnAirSnoozeManager.swift; sourceTree = "<group>"; };
 		48A2E83C7C0A1552B059E390 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
 		4D855FFC6A0E3F07DF4B3338 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicGuardApp.swift; sourceTree = "<group>"; };
 		5402F144B596FE9D04B12231 /* DeviceWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWatchdog.swift; sourceTree = "<group>"; };
+		58A53A63F92F43E8D9A9A49D /* PopoverContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverContentView.swift; sourceTree = "<group>"; };
 		5F9EF3670D38515CF80725F1 /* VolumeGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeGuard.swift; sourceTree = "<group>"; };
 		65D046220518AE607C60266E /* AudioDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceTests.swift; sourceTree = "<group>"; };
+		6A5E834163AD279EB488F764 /* PopoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverViewModel.swift; sourceTree = "<group>"; };
 		6D718142792A4F0FFF7A5482 /* OnAirIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnAirIndicator.swift; sourceTree = "<group>"; };
-		824923C92EEC9AB5A32B9B5C /* MenuItemFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuItemFactory.swift; sourceTree = "<group>"; };
 		88F857EAE679C6AA4409D5FE /* PreferencesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManager.swift; sourceTree = "<group>"; };
 		8917135B81208F598CC7F2D2 /* DeviceWatchdogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWatchdogTests.swift; sourceTree = "<group>"; };
 		9090B7CE10EEA47ADDC7F868 /* PreferencesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManagerTests.swift; sourceTree = "<group>"; };
 		951A3423131A20D2D7086FA6 /* OnAirIndicatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnAirIndicatorTests.swift; sourceTree = "<group>"; };
 		9E7F4C0FED52F70576F084DC /* MicGuardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MicGuardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2A1B6263BD6B2B8700D52D4 /* DevicePriorityListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicePriorityListView.swift; sourceTree = "<group>"; };
 		A6E55EE43EBEC5B1089E6F35 /* MockAudioDeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAudioDeviceManager.swift; sourceTree = "<group>"; };
 		B2BC6EAF3148A8BF4BC51F46 /* MicGuard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MicGuard.entitlements; sourceTree = "<group>"; };
+		B9F0CAF67D77E5A753CD26A0 /* MGLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MGLog.swift; sourceTree = "<group>"; };
 		BE7ED869E2FB562761102E7E /* ActivityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitor.swift; sourceTree = "<group>"; };
 		C09AF8FC8B60E166A64F34C5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C2A0A7A0D04087851FF0A344 /* OutputDeviceWatchdogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputDeviceWatchdogTests.swift; sourceTree = "<group>"; };
@@ -143,6 +143,16 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		82D8237EF6D66EC564742D2A /* MenuPopover */ = {
+			isa = PBXGroup;
+			children = (
+				A2A1B6263BD6B2B8700D52D4 /* DevicePriorityListView.swift */,
+				58A53A63F92F43E8D9A9A49D /* PopoverContentView.swift */,
+				6A5E834163AD279EB488F764 /* PopoverViewModel.swift */,
+			);
+			path = MenuPopover;
+			sourceTree = "<group>";
+		};
 		8A04B3A00C4251AC5E78BEF5 /* Mocks */ = {
 			isa = PBXGroup;
 			children = (
@@ -165,11 +175,8 @@
 		D656CF54723DABC7D76B255A /* UI */ = {
 			isa = PBXGroup;
 			children = (
-				19207A383ED9BB3AFBE2E7FF /* DeviceSubmenuBuilder.swift */,
-				824923C92EEC9AB5A32B9B5C /* MenuItemFactory.swift */,
+				82D8237EF6D66EC564742D2A /* MenuPopover */,
 				6D718142792A4F0FFF7A5482 /* OnAirIndicator.swift */,
-				41D627FD83CCD96352B8EC3C /* OnAirSnoozeManager.swift */,
-				15468AA3DBB5B0D57A889119 /* OutputDeviceSubmenuBuilder.swift */,
 				026BA6A21433C1568EAAE69D /* StatusBarController.swift */,
 			);
 			path = UI;
@@ -195,6 +202,7 @@
 		EB5A5A5487D4A33480F27F02 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				B9F0CAF67D77E5A753CD26A0 /* MGLog.swift */,
 				4D855FFC6A0E3F07DF4B3338 /* NotificationManager.swift */,
 				88F857EAE679C6AA4409D5FE /* PreferencesManager.swift */,
 				2F63A1260DED312BCCD8C589 /* StatsManager.swift */,
@@ -294,14 +302,14 @@
 				FA5881E4AF863D54EA5C02A6 /* ActivityMonitor.swift in Sources */,
 				377FBE04435A4F710B7C8664 /* AppDelegate.swift in Sources */,
 				2B6FFA37D11AE09E9F5211D5 /* AudioDeviceManager.swift in Sources */,
-				2822A8D38A715FC16A6B03DA /* DeviceSubmenuBuilder.swift in Sources */,
+				7DD1F836F15E4352B2D50596 /* DevicePriorityListView.swift in Sources */,
 				5F60D898A14EC0DF001E973C /* DeviceWatchdog.swift in Sources */,
-				913BFEB4FF0DA78F904D504E /* MenuItemFactory.swift in Sources */,
+				2021B0AF5767E6BF4E625390 /* MGLog.swift in Sources */,
 				4AA2A2771ED2D157DF8A307F /* MicGuardApp.swift in Sources */,
 				EEDA6E1DD2C97227F4AA7CAE /* NotificationManager.swift in Sources */,
 				61EF87980C7292C453E3A064 /* OnAirIndicator.swift in Sources */,
-				9F3EE843A46A8B606A5978A0 /* OnAirSnoozeManager.swift in Sources */,
-				8418F866A545D7CEE0A46464 /* OutputDeviceSubmenuBuilder.swift in Sources */,
+				4A788FB92EC420295BCD1913 /* PopoverContentView.swift in Sources */,
+				60BB5B71AE333E741C4B7E63 /* PopoverViewModel.swift in Sources */,
 				B524CE1CCCEF19FC50FECBCD /* PreferencesManager.swift in Sources */,
 				17F6FDB26D51ECBCA88E5800 /* ProcessMonitor.swift in Sources */,
 				9474CDD3F6E89ECC9B65952B /* StatsManager.swift in Sources */,

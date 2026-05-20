@@ -4,67 +4,76 @@ This file provides context for AI assistants working on this codebase. If you're
 
 ## Overview
 
-Native macOS menu bar app (Swift/AppKit, CoreAudio). Prevents OS and apps from hijacking audio device selection or volume levels. Zero external dependencies.
+Native macOS menu bar app (Swift, AppKit shell + SwiftUI popover, CoreAudio). Prevents OS and apps from hijacking audio device selection or volume levels. Zero external dependencies.
 
 **Build:** `swift build` | **Test:** `swift test` | **Run:** Xcode Cmd+R
 
 ## Architecture
 
-Layered component architecture with dependency injection and Combine-based reactive communication.
+Layered components with dependency injection and Combine-based reactive communication. UI is a SwiftUI popover hosted in an `NSPopover` attached to an `NSStatusItem`.
 
-**Initialization order** (AppDelegate.applicationDidFinishLaunching):
-1. `AudioDeviceManager` — CoreAudio wrapper (device enumeration, volume control, listener registration)
-2. `DeviceWatchdog` / `OutputDeviceWatchdog` — enforces preferred device via priority-ordered list
-3. `VolumeGuard` — enforces target volume using CoreAudio property listeners
-4. `ActivityMonitor` — detects mic-in-use state via CoreAudio running state + polling fallback
-5. `StatusBarController` — menu bar UI, receives all above as dependencies
+**Initialization order** (`AppDelegate.applicationDidFinishLaunching`):
+1. `AudioDeviceManager` — CoreAudio wrapper (device enumeration, volume control, listener registration, publishes `devicesChangedPublisher` / `defaultInputChangedPublisher` / `defaultOutputChangedPublisher`)
+2. `DeviceWatchdog` and `OutputDeviceWatchdog` — both subclass `BaseDeviceWatchdog`; enforce preferred device via priority-ordered list, with optional auto-yield on repeated override and auto-resume on top-priority pick
+3. `VolumeGuard` — enforces target input volume using CoreAudio property listeners
+4. `ActivityMonitor` — detects mic-in-use state via CoreAudio running state + polling fallback; supports `overrideMonitoredDevice` so the On Air indicator stays correct when the locked device differs from the system default
+5. `StatusBarController` — owns the `NSStatusItem`, `NSPopover`, `OnAirIndicator`, and constructs `PopoverViewModel` for the SwiftUI UI
 
 **Source layout:**
-- `MicGuard/App/` — Entry point and lifecycle (AppDelegate coordinates everything)
-- `MicGuard/Core/` — AudioDeviceManager, DeviceWatchdog, VolumeGuard, ActivityMonitor, ProcessMonitor
-- `MicGuard/UI/` — StatusBarController, DeviceSubmenuBuilder, OutputDeviceSubmenuBuilder, MenuItemFactory, OnAirIndicator, OnAirSnoozeManager
-- `MicGuard/Utilities/` — PreferencesManager, StatsManager, NotificationManager
-- `MicGuardTests/Mocks/` — MockAudioDeviceManager for protocol-based testing
+- `MicGuard/App/` — Entry point and lifecycle (`AppDelegate` coordinates everything)
+- `MicGuard/Core/` — `AudioDeviceManager`, `DeviceWatchdog` (file contains `BaseDeviceWatchdog`, `DeviceWatchdog`, `OutputDeviceWatchdog`), `VolumeGuard`, `ActivityMonitor`, `ProcessMonitor`
+- `MicGuard/UI/` — `StatusBarController` (thin shell, ~220 lines), `OnAirIndicator` (menu-bar icon states, flash labels, pulse)
+- `MicGuard/UI/MenuPopover/` — `PopoverViewModel` (`@MainActor ObservableObject` bridging managers to SwiftUI), `PopoverContentView` (tabbed root view: Input / Output / Settings), `DevicePriorityListView` (drag-reorderable device list)
+- `MicGuard/Utilities/` — `PreferencesManager`, `StatsManager`, `NotificationManager` (dormant), `MGLog` (debug-only logger, compiled out in Release)
+- `MicGuardTests/Mocks/` — `MockAudioDeviceManager` for protocol-based testing
 
 ## Data Flows
 
-**Device hijack prevention:** User sets device priority → DeviceWatchdog subscribes to `defaultInputChangedPublisher` → CoreAudio fires on device change → Watchdog checks against priority list → calls `setDefaultInputDevice()` → fires `onDeviceHijackBlocked` callback → stats increment + UI flash.
+**Device hijack prevention:** User sets device priority → watchdog subscribes to `defaultInputChangedPublisher` / `defaultOutputChangedPublisher` → CoreAudio fires on device change → watchdog checks against priority list → calls `setDefaultInputDevice()` / `setDefaultOutputDevice()` → fires `onDeviceHijackBlocked` → stats increment + `INPUT HELD` / `OUTPUT HELD` flash on the status item.
 
-**Volume lock:** VolumeGuard attaches CoreAudio listener to device volume property → detects drift beyond tolerance (0.01) → debounces (2.5s) → corrects volume → anti-fight throttle (max 10 corrections per 5s window).
+**Smart protection:**
+- *Auto-yield* (`autoYieldOnRepeatedOverride`, default on): after the user repeatedly overrides the watchdog within a short window, the watchdog yields and fires `onYielded` + an `INPUT/OUTPUT CHANGED` green flash. Yielded state is cleared via the `userRequestedResumeInputProtection` / `userRequestedResumeOutputProtection` notifications (posted by the popover's "Reactivate" button and the right-click menu).
+- *Auto-resume* (`autoResumeOnTopPriorityPick`, default off): if the user manually picks the top-priority device while yielded, watchdog resumes protection automatically and fires `onProtectionResumed`.
 
-**Smart reset:** ActivityMonitor checks `isDeviceRunning` (device-level, not per-app) → when mic stops → `onMeetingEnded` fires → if strategy is `resetWhenMicStops` and current volume < target → resets volume.
+**Volume lock:** `VolumeGuard` attaches a CoreAudio listener to the device volume property → detects drift beyond tolerance (`0.01`) → debounces (default 2.5s) → corrects volume → anti-fight throttle (max 10 corrections per 5s window).
 
-**Preference propagation:** UI change → PreferencesManager writes UserDefaults + publishes key via Combine → AppDelegate dispatches to appropriate guard component.
+**Smart reset:** `ActivityMonitor` checks `isDeviceRunning` (device-level, not per-app) → when mic stops → `onMeetingEnded` fires → if strategy is `resetWhenMicStops` and current volume < target → resets volume.
+
+**Per-device output volume:** When `defaultOutputChangedPublisher` fires, `AppDelegate` looks up a per-UID target via `preferencesManager.outputDeviceVolume(for:)` and sets the device volume **once** (set-on-activation; no continuous enforcement). Lets users keep wildly different levels for headphones vs. speakers without rebalancing every switch.
+
+**Preference propagation:** UI change → `PreferencesManager` writes UserDefaults + publishes key via `preferencesChangedPublisher` → `AppDelegate.handlePreferenceChange(key:)` dispatches to the right guard component. A few legacy `NotificationCenter` names (`preferredInputDeviceChanged`, `preferredOutputDeviceChanged`) are still used for device-order updates.
 
 ## Where to Add New Code
 
-**New enforcement feature:** Add to `MicGuard/Core/`. Create protocol for testability. Inject AudioDeviceManager. Wire callbacks in AppDelegate. Register cleanup in `applicationWillTerminate`.
+**New enforcement feature:** Add to `MicGuard/Core/`. Create protocol for testability. Inject `AudioDeviceManager`. Wire callbacks in `AppDelegate`. Register cleanup in `applicationWillTerminate`.
 
-**New UI control:** Add to `StatusBarController.setupMenu()`. Frame-based NSView layout (not Auto Layout). Tag arithmetic for label/slider association (tag + 1000). Commit slider values on mouseUp only, not continuous drag.
+**New UI control:** Add to the SwiftUI views under `MicGuard/UI/MenuPopover/`. Expose state via `@Published` on `PopoverViewModel` and a write-through method that calls `PreferencesManager`. Avoid writing volume / continuous values to `PreferencesManager` on every drag tick — gate the commit on `onEditingChanged: false` (mouse-up) to keep the UserDefaults → Combine → CoreAudio chain quiet.
 
-**New preference:** Add key to PreferencesManager (getter/setter + UserDefaults + publish key). Add to protocol. Handle in AppDelegate's `handlePreferenceChange(key:)`.
+**New preference:** Add key + getter/setter to `PreferencesManager`, expose on the `PreferencesManaging` protocol, publish the key via `preferencesChangedPublisher`, and handle it in `AppDelegate.handlePreferenceChange(key:)`.
 
-**New test:** Add `{Component}Tests.swift` in MicGuardTests. Use MockAudioDeviceManager for deterministic testing.
+**New test:** Add `{Component}Tests.swift` in `MicGuardTests`. Use `MockAudioDeviceManager` for deterministic testing.
 
 ## Known Limitations
 
-**"Reset When Mic Not In Use" misses overlapping app usage:** `isDeviceRunning` is device-level — if Discord holds the mic while you leave a Zoom call, the device stays "running" and the volume reset never triggers. Users in persistent voice calls should use "Lock Input Volume" instead.
+**"Reset When Mic Not In Use" misses overlapping app usage:** `isDeviceRunning` is device-level — if Discord holds the mic while you leave a Zoom call, the device stays "running" and the reset never triggers. Users in persistent voice calls should use "Lock Input Volume" instead.
 
-**Notifications disabled:** Commented out in AppDelegate due to bundle identifier crash when running outside Xcode.
+**Notifications disabled:** `NotificationManager` exists but is not wired up in `AppDelegate` (commented out due to a bundle-identifier crash when running outside Xcode).
 
-**StatusBarController is large (~800 lines):** Menu building, state management, and event subscriptions in one file. Some extraction done (OnAirIndicator, OnAirSnoozeManager, DeviceSubmenuBuilder) but more could be split out.
-
-**CoreAudio listener lifecycle is fragile:** Listeners registered per-device can fail silently if device ID becomes invalid between registration and removal. Always check removal status.
+**CoreAudio listener lifecycle is fragile:** Listeners registered per-device can fail silently if a device ID becomes invalid between registration and removal. Always check removal status.
 
 **ProcessMonitor uses hardcoded bundle IDs:** New audio apps won't be detected until bundle IDs are added. Falls back to `.nonRTC` for unknown apps.
 
-**No anti-fight test coverage:** VolumeGuard throttle mechanism works but has no unit tests.
+**Name-based device matching is ambiguous:** When a device reconnects with a new UID, matching falls back to its display name. Two devices with the same name produce an arbitrary match (`onDeviceMatchAmbiguous` callback is fired but not surfaced).
+
+**`unsettableUIDs` is per-session only:** Devices macOS silently refuses to set as default (BlackHole, Teams Audio, aggregates) are tracked in `PopoverViewModel` to dim them in the UI, but the set isn't persisted across launches.
+
+**No anti-fight test coverage:** `VolumeGuard` throttle mechanism works but has no unit tests.
 
 ## Conventions
 
-- Protocols: `AudioDeviceManaging`, `DeviceWatchdogProtocol`, `PreferencesManaging`
-- Callbacks: closure-based (`onDeviceHijackBlocked`, `onVolumeCorrected`, `onMeetingEnded`)
-- Reactive: Combine PassthroughSubject publishers for cross-component communication
-- Logging: `print()` with emoji prefixes (no logging framework)
-- Volume values: Float 0.0–1.0, clamped via `max(0, min(1, value))`
-- Package.swift explicitly lists all source files — update it when adding new files
+- Protocols: `AudioDeviceManaging`, `DeviceWatchdogProtocol`, `VolumeGuardProtocol`, `PreferencesManaging`, `StatsManaging`
+- Cross-component: closure callbacks on the core components (`onDeviceHijackBlocked`, `onYielded`, `onProtectionResumed`, `onVolumeCorrected`, `onMeetingEnded`); Combine `PassthroughSubject` publishers on `AudioDeviceManager` and `PreferencesManager`
+- Logging: `MGLog.debug("...")` only — backed by `NSLog` in DEBUG, compiled out entirely in Release. Don't use `print()`.
+- Volume values: `Float` 0.0–1.0, clamped via `max(0, min(1, value))`
+- `Package.swift` explicitly lists every source file — update it when adding new files
+- UI uses SwiftUI inside the popover and `@MainActor` on `StatusBarController` / `PopoverViewModel`. `OnAirIndicator` still uses AppKit (`NSStatusItem` / `NSImage`) for the menu-bar icon itself.
