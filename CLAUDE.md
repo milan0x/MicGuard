@@ -9,7 +9,9 @@ swift build          # Build via SPM
 swift test           # Run all tests
 ```
 
-- Package.swift explicitly lists all source files — update it when adding new files
-- Slider values: update label on drag, commit to PreferencesManager only on mouseUp
-- CoreAudio listener cleanup in `applicationWillTerminate` is critical — AudioDeviceManager is set to nil
-- Notifications are disabled (bundle identifier crash outside Xcode)
+- The menu-bar UI is a SwiftUI popover (`MicGuard/UI/MenuPopover/`) hosted in an `NSPopover`. State lives on `PopoverViewModel` (`@MainActor ObservableObject`).
+- `Package.swift` explicitly lists all source files — update it when adding new files.
+- For sliders / continuous controls, commit to `PreferencesManager` on edit-end (mouse-up), not on every tick — the chain `UserDefaults → Combine → CoreAudio` is expensive.
+- CoreAudio listener cleanup in `applicationWillTerminate` is critical — `AudioDeviceManager` is set to `nil` so listener removal runs even on force-quit.
+- Use `MGLog.debug(...)` for diagnostics — it compiles out in Release. Don't add `print()` calls.
+- `NotificationManager` is dormant (bundle-identifier crash outside Xcode).
