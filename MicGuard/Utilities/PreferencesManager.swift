@@ -10,6 +10,12 @@ import Combine
 
 // MARK: - Volume Control Strategy
 
+enum MicInUseIndicatorStyle: String, CaseIterable {
+    case orangePill
+    case redTint
+    case none
+}
+
 enum VolumeControlStrategy: String, CaseIterable {
     case none
     case lockVolume
@@ -34,6 +40,7 @@ protocol PreferencesManaging: AnyObject {
     var preferredInputDeviceUID: String? { get set }
     var preferredInputDeviceOrder: [String] { get set }
     var inputDeviceLockEnabled: Bool { get set }
+    var inputAutoSwitchEnabled: Bool { get set }
 
     // Output Device Preferences
     var preferredOutputDeviceUID: String? { get set }
@@ -49,10 +56,10 @@ protocol PreferencesManaging: AnyObject {
     var launchAtLogin: Bool { get set }
     var showInMenuBar: Bool { get set }
     var showNotifications: Bool { get set }
-    var showOnAirIndicator: Bool { get set }
-    var onAirSnoozeUntil: Date? { get set }
-    var isOnAirSnoozed: Bool { get }
     var showStats: Bool { get set }
+    var micInUseIndicatorStyle: MicInUseIndicatorStyle { get set }
+    var autoYieldOnRepeatedOverride: Bool { get set }
+    var autoResumeOnTopPriorityPick: Bool { get set }
 
     // Input device order management
     func moveDevice(uid: String, direction: MoveDirection)
@@ -67,6 +74,11 @@ protocol PreferencesManaging: AnyObject {
     // Device name cache (for showing names when disconnected)
     func cacheDeviceName(uid: String, name: String)
     func cachedDeviceName(for uid: String) -> String?
+
+    // Per-output-device default volume (0.0–1.0).
+    // Applied once when the device becomes the system output.
+    func outputDeviceVolume(for uid: String) -> Float?
+    func setOutputDeviceVolume(_ volume: Float?, for uid: String)
 
     // UID migration (for name-based device matching after reconnection)
     func replaceDeviceUID(oldUID: String, newUID: String)
@@ -83,6 +95,7 @@ private enum PreferenceKey: String {
     case preferredInputDeviceUID = "PreferredInputDeviceUID"
     case preferredInputDeviceOrder = "PreferredInputDeviceOrder"
     case inputDeviceLockEnabled = "InputDeviceLockEnabled"
+    case inputAutoSwitchEnabled = "InputAutoSwitchEnabled"
 
     // Output Device Preferences
     case preferredOutputDeviceUID = "PreferredOutputDeviceUID"
@@ -97,13 +110,17 @@ private enum PreferenceKey: String {
     // Device Name Cache
     case deviceNameCache = "DeviceNameCache"
 
+    // Per-output-device default volume (UID → Float scalar)
+    case outputDeviceVolumes = "OutputDeviceVolumes"
+
     // App Settings
     case launchAtLogin = "LaunchAtLogin"
     case showInMenuBar = "ShowInMenuBar"
     case showNotifications = "ShowNotifications"
-    case showOnAirIndicator = "ShowOnAirIndicator"
-    case onAirSnoozeUntil = "OnAirSnoozeUntil"
     case showStats = "ShowStats"
+    case micInUseIndicatorStyle = "MicInUseIndicatorStyle"
+    case autoYieldOnRepeatedOverride = "AutoYieldOnRepeatedOverride"
+    case autoResumeOnTopPriorityPick = "AutoResumeOnTopPriorityPick"
 }
 
 // MARK: - PreferencesManager Implementation
@@ -130,6 +147,7 @@ class PreferencesManager: PreferencesManaging {
     private func registerDefaults() {
         defaults.register(defaults: [
             PreferenceKey.inputDeviceLockEnabled.rawValue: false,
+            PreferenceKey.inputAutoSwitchEnabled.rawValue: false,
             PreferenceKey.outputDeviceLockEnabled.rawValue: false,
             PreferenceKey.outputAutoSwitchEnabled.rawValue: false,
             PreferenceKey.volumeControlStrategy.rawValue: VolumeControlStrategy.resetWhenMicStops.rawValue,
@@ -137,8 +155,10 @@ class PreferencesManager: PreferencesManaging {
             PreferenceKey.launchAtLogin.rawValue: false,
             PreferenceKey.showInMenuBar.rawValue: true,
             PreferenceKey.showNotifications.rawValue: true,
-            PreferenceKey.showOnAirIndicator.rawValue: true,
-            PreferenceKey.showStats.rawValue: false
+            PreferenceKey.showStats.rawValue: false,
+            PreferenceKey.micInUseIndicatorStyle.rawValue: MicInUseIndicatorStyle.redTint.rawValue,
+            PreferenceKey.autoYieldOnRepeatedOverride.rawValue: true,
+            PreferenceKey.autoResumeOnTopPriorityPick.rawValue: false
         ])
     }
     
@@ -157,6 +177,14 @@ class PreferencesManager: PreferencesManaging {
         set {
             defaults.set(newValue, forKey: PreferenceKey.inputDeviceLockEnabled.rawValue)
             preferencesChangedPublisher.send(PreferenceKey.inputDeviceLockEnabled.rawValue)
+        }
+    }
+
+    var inputAutoSwitchEnabled: Bool {
+        get { defaults.bool(forKey: PreferenceKey.inputAutoSwitchEnabled.rawValue) }
+        set {
+            defaults.set(newValue, forKey: PreferenceKey.inputAutoSwitchEnabled.rawValue)
+            preferencesChangedPublisher.send(PreferenceKey.inputAutoSwitchEnabled.rawValue)
         }
     }
     
@@ -266,40 +294,41 @@ class PreferencesManager: PreferencesManaging {
         }
     }
     
-    var showOnAirIndicator: Bool {
-        get { defaults.bool(forKey: PreferenceKey.showOnAirIndicator.rawValue) }
-        set {
-            defaults.set(newValue, forKey: PreferenceKey.showOnAirIndicator.rawValue)
-            preferencesChangedPublisher.send(PreferenceKey.showOnAirIndicator.rawValue)
-        }
-    }
-
-    var onAirSnoozeUntil: Date? {
-        get {
-            let interval = defaults.double(forKey: PreferenceKey.onAirSnoozeUntil.rawValue)
-            guard interval > 0 else { return nil }
-            return Date(timeIntervalSince1970: interval)
-        }
-        set {
-            if let date = newValue {
-                defaults.set(date.timeIntervalSince1970, forKey: PreferenceKey.onAirSnoozeUntil.rawValue)
-            } else {
-                defaults.removeObject(forKey: PreferenceKey.onAirSnoozeUntil.rawValue)
-            }
-            preferencesChangedPublisher.send(PreferenceKey.onAirSnoozeUntil.rawValue)
-        }
-    }
-
-    var isOnAirSnoozed: Bool {
-        guard let snoozeEnd = onAirSnoozeUntil else { return false }
-        return snoozeEnd > Date()
-    }
-
     var showStats: Bool {
         get { defaults.bool(forKey: PreferenceKey.showStats.rawValue) }
         set {
             defaults.set(newValue, forKey: PreferenceKey.showStats.rawValue)
             preferencesChangedPublisher.send(PreferenceKey.showStats.rawValue)
+        }
+    }
+
+    var micInUseIndicatorStyle: MicInUseIndicatorStyle {
+        get {
+            guard let raw = defaults.string(forKey: PreferenceKey.micInUseIndicatorStyle.rawValue),
+                  let style = MicInUseIndicatorStyle(rawValue: raw) else {
+                return .redTint
+            }
+            return style
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: PreferenceKey.micInUseIndicatorStyle.rawValue)
+            preferencesChangedPublisher.send(PreferenceKey.micInUseIndicatorStyle.rawValue)
+        }
+    }
+
+    var autoYieldOnRepeatedOverride: Bool {
+        get { defaults.bool(forKey: PreferenceKey.autoYieldOnRepeatedOverride.rawValue) }
+        set {
+            defaults.set(newValue, forKey: PreferenceKey.autoYieldOnRepeatedOverride.rawValue)
+            preferencesChangedPublisher.send(PreferenceKey.autoYieldOnRepeatedOverride.rawValue)
+        }
+    }
+
+    var autoResumeOnTopPriorityPick: Bool {
+        get { defaults.bool(forKey: PreferenceKey.autoResumeOnTopPriorityPick.rawValue) }
+        set {
+            defaults.set(newValue, forKey: PreferenceKey.autoResumeOnTopPriorityPick.rawValue)
+            preferencesChangedPublisher.send(PreferenceKey.autoResumeOnTopPriorityPick.rawValue)
         }
     }
     
@@ -435,6 +464,27 @@ class PreferencesManager: PreferencesManaging {
     func cachedDeviceName(for uid: String) -> String? {
         let cache = defaults.dictionary(forKey: PreferenceKey.deviceNameCache.rawValue) as? [String: String]
         return cache?[uid]
+    }
+
+    // MARK: - Per-Output-Device Volume
+
+    func outputDeviceVolume(for uid: String) -> Float? {
+        guard let dict = defaults.dictionary(forKey: PreferenceKey.outputDeviceVolumes.rawValue) as? [String: Double],
+              let value = dict[uid] else {
+            return nil
+        }
+        return Float(value)
+    }
+
+    func setOutputDeviceVolume(_ volume: Float?, for uid: String) {
+        var dict = (defaults.dictionary(forKey: PreferenceKey.outputDeviceVolumes.rawValue) as? [String: Double]) ?? [:]
+        if let volume = volume {
+            dict[uid] = Double(max(0, min(1, volume)))
+        } else {
+            dict.removeValue(forKey: uid)
+        }
+        defaults.set(dict, forKey: PreferenceKey.outputDeviceVolumes.rawValue)
+        preferencesChangedPublisher.send(PreferenceKey.outputDeviceVolumes.rawValue)
     }
 
     // MARK: - UID Migration

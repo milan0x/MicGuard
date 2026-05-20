@@ -41,7 +41,6 @@ final class PreferencesManagerTests: XCTestCase {
         XCTAssertFalse(preferencesManager.launchAtLogin)
         XCTAssertTrue(preferencesManager.showInMenuBar)
         XCTAssertTrue(preferencesManager.showNotifications)
-        XCTAssertTrue(preferencesManager.showOnAirIndicator)
         XCTAssertFalse(preferencesManager.showStats)
     }
 
@@ -115,34 +114,6 @@ final class PreferencesManagerTests: XCTestCase {
 
         XCTAssertFalse(preferencesManager.showNotifications)
         XCTAssertFalse(testDefaults.bool(forKey: "ShowNotifications"))
-    }
-
-    func testShowOnAirIndicatorPersistence() {
-        preferencesManager.showOnAirIndicator = false
-
-        XCTAssertFalse(preferencesManager.showOnAirIndicator)
-        XCTAssertFalse(testDefaults.bool(forKey: "ShowOnAirIndicator"))
-    }
-
-    func testOnAirSnoozeUntilPersistence() {
-        let futureDate = Date().addingTimeInterval(3600)
-        preferencesManager.onAirSnoozeUntil = futureDate
-
-        XCTAssertNotNil(preferencesManager.onAirSnoozeUntil)
-        XCTAssertTrue(preferencesManager.isOnAirSnoozed)
-    }
-
-    func testIsOnAirSnoozedReturnsFalseWhenExpired() {
-        let pastDate = Date().addingTimeInterval(-3600)
-        preferencesManager.onAirSnoozeUntil = pastDate
-
-        XCTAssertFalse(preferencesManager.isOnAirSnoozed)
-    }
-
-    func testIsOnAirSnoozedReturnsFalseWhenNil() {
-        preferencesManager.onAirSnoozeUntil = nil
-
-        XCTAssertFalse(preferencesManager.isOnAirSnoozed)
     }
 
     // MARK: - Device Order Management Tests

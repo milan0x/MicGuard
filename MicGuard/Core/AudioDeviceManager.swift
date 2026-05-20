@@ -18,11 +18,29 @@ struct AudioDevice: Identifiable, Equatable, Hashable {
     let name: String
     let isInput: Bool
     let isOutput: Bool
-    
+    let transportType: UInt32
+
+    init(id: AudioDeviceID, uid: String, name: String, isInput: Bool, isOutput: Bool, transportType: UInt32 = 0) {
+        self.id = id
+        self.uid = uid
+        self.name = name
+        self.isInput = isInput
+        self.isOutput = isOutput
+        self.transportType = transportType
+    }
+
+    /// Heuristic: virtual / aggregate devices are usually rejected by macOS as the
+    /// system default. False positives possible (e.g. Loopback by Rogue Amoeba).
+    /// Reactive detection in the popover view model catches whatever this misses.
+    var isLikelyUnsettable: Bool {
+        transportType == kAudioDeviceTransportTypeVirtual
+            || transportType == kAudioDeviceTransportTypeAggregate
+    }
+
     static func == (lhs: AudioDevice, rhs: AudioDevice) -> Bool {
         return lhs.uid == rhs.uid
     }
-    
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(uid)
     }
@@ -42,6 +60,8 @@ protocol AudioDeviceManaging {
     func setDefaultOutputDevice(_ device: AudioDevice) -> Bool
     func getInputVolume(for device: AudioDevice) -> Float?
     func setInputVolume(_ volume: Float, for device: AudioDevice) -> Bool
+    func getOutputVolume(for device: AudioDevice) -> Float?
+    func setOutputVolume(_ volume: Float, for device: AudioDevice) -> Bool
     func isDeviceRunning(_ device: AudioDevice) -> Bool
     func device(forUID uid: String) -> AudioDevice?
     func inputDevices(withName name: String) -> [AudioDevice]
@@ -72,8 +92,10 @@ class AudioDeviceManager: AudioDeviceManaging {
     private var deviceListListenerBlock: AudioObjectPropertyListenerBlock?
     private var defaultInputListenerBlock: AudioObjectPropertyListenerBlock?
     private var defaultOutputListenerBlock: AudioObjectPropertyListenerBlock?
-    private var inputRunningListenerBlock: AudioObjectPropertyListenerBlock?
-    private var inputRunningListenerDeviceID: AudioDeviceID?
+
+    // Per-device running-state listeners. Keyed by deviceID so we can detach
+    // a device's listener when it disappears from the system.
+    private var inputRunningListenerBlocks: [(AudioDeviceID, AudioObjectPropertyListenerBlock)] = []
     private var streamActiveListenerBlocks: [(AudioStreamID, AudioObjectPropertyListenerBlock)] = []
     
     // MARK: - Computed Properties
@@ -165,6 +187,15 @@ class AudioDeviceManager: AudioDeviceManaging {
     func setInputVolume(_ volume: Float, for device: AudioDevice) -> Bool {
         return setVolume(volume, deviceID: device.id, isInput: true)
     }
+
+    func getOutputVolume(for device: AudioDevice) -> Float? {
+        return getVolume(deviceID: device.id, isInput: false)
+    }
+
+    @discardableResult
+    func setOutputVolume(_ volume: Float, for device: AudioDevice) -> Bool {
+        return setVolume(volume, deviceID: device.id, isInput: false)
+    }
     
     // MARK: - Activity Detection
 
@@ -229,20 +260,33 @@ class AudioDeviceManager: AudioDeviceManaging {
               let uid = getDeviceUID(deviceID: deviceID) else {
             return nil
         }
-        
+
         let hasInput = hasStreams(deviceID: deviceID, isInput: true)
         let hasOutput = hasStreams(deviceID: deviceID, isInput: false)
-        
+
         // Skip devices with no streams
         guard hasInput || hasOutput else { return nil }
-        
+
         return AudioDevice(
             id: deviceID,
             uid: uid,
             name: name,
             isInput: hasInput,
-            isOutput: hasOutput
+            isOutput: hasOutput,
+            transportType: getTransportType(deviceID: deviceID)
         )
+    }
+
+    private func getTransportType(deviceID: AudioDeviceID) -> UInt32 {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &size, &value)
+        return status == noErr ? value : 0
     }
     
     private func getDeviceName(deviceID: AudioDeviceID) -> String? {
@@ -409,57 +453,55 @@ class AudioDeviceManager: AudioDeviceManaging {
         return status == noErr
     }
     
-    // MARK: - Running State Listener
+    // MARK: - Running State Listeners
 
-    private func registerInputRunningListener(deviceID: AudioDeviceID) {
-        unregisterInputRunningListener()
+    /// Attach the device-running listener and stream-active listeners to ALL real
+    /// input devices, not just the current default. This makes the mic-in-use
+    /// indicator fire instantly when any app starts/stops capturing from any mic —
+    /// without it, non-default devices only get caught by the 2s polling fallback.
+    private func registerAllInputRunningListeners() {
+        unregisterAllInputRunningListeners()
 
-        // Listener 1: Device-level running state (may be TCC-gated on newer macOS)
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
 
-        inputRunningListenerBlock = { [weak self] (_, _) in
-            DispatchQueue.main.async {
-                self?.inputDeviceRunningChangedPublisher.send()
+        for device in inputDevices {
+            // Skip virtual / aggregate — they tend to fire spurious "running" events
+            // (Teams Audio is "running" any time Teams routes audio) which would
+            // create false ON indicator triggers.
+            if device.isLikelyUnsettable { continue }
+
+            let block: AudioObjectPropertyListenerBlock = { [weak self] (_, _) in
+                DispatchQueue.main.async {
+                    self?.inputDeviceRunningChangedPublisher.send()
+                }
             }
+            AudioObjectAddPropertyListenerBlock(device.id, &address, nil, block)
+            inputRunningListenerBlocks.append((device.id, block))
+
+            registerStreamActiveListeners(deviceID: device.id)
         }
-
-        AudioObjectAddPropertyListenerBlock(
-            deviceID,
-            &address,
-            nil,
-            inputRunningListenerBlock!
-        )
-
-        inputRunningListenerDeviceID = deviceID
-
-        // Listener 2: Stream-level active state (not TCC-gated)
-        registerStreamActiveListeners(deviceID: deviceID)
     }
 
-    private func unregisterInputRunningListener() {
-        guard let deviceID = inputRunningListenerDeviceID,
-              let block = inputRunningListenerBlock else { return }
-
+    private func unregisterAllInputRunningListeners() {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
 
-        AudioObjectRemovePropertyListenerBlock(deviceID, &address, nil, block)
-        inputRunningListenerBlock = nil
-        inputRunningListenerDeviceID = nil
+        for (deviceID, block) in inputRunningListenerBlocks {
+            AudioObjectRemovePropertyListenerBlock(deviceID, &address, nil, block)
+        }
+        inputRunningListenerBlocks.removeAll()
 
         unregisterStreamActiveListeners()
     }
 
     private func registerStreamActiveListeners(deviceID: AudioDeviceID) {
-        unregisterStreamActiveListeners()
-
         var streamsAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreams,
             mScope: kAudioDevicePropertyScopeInput,
@@ -519,8 +561,11 @@ class AudioDeviceManager: AudioDeviceManaging {
         
         deviceListListenerBlock = { [weak self] (_, _) in
             DispatchQueue.main.async {
-                NSLog("[MicGuard.CoreAudio] kAudioHardwarePropertyDevices fired")
+                MGLog.debug("[MicGuard.CoreAudio] kAudioHardwarePropertyDevices fired")
                 self?.refreshDeviceList()
+                // Re-attach per-device running-state listeners so newly-plugged
+                // mics participate in the event-driven detection.
+                self?.registerAllInputRunningListeners()
                 self?.devicesChangedPublisher.send()
             }
         }
@@ -542,12 +587,11 @@ class AudioDeviceManager: AudioDeviceManaging {
         defaultInputListenerBlock = { [weak self] (_, _) in
             DispatchQueue.main.async {
                 let dev = self?.defaultInputDevice
-                NSLog("[MicGuard.CoreAudio] kAudioHardwarePropertyDefaultInputDevice fired → \(dev?.name ?? "nil")")
+                MGLog.debug("[MicGuard.CoreAudio] kAudioHardwarePropertyDefaultInputDevice fired → \(dev?.name ?? "nil")")
                 self?.defaultInputChangedPublisher.send(dev)
-                // Re-register running state listener on the new default input device
-                if let deviceID = self?.getDefaultDeviceID(isInput: true) {
-                    self?.registerInputRunningListener(deviceID: deviceID)
-                }
+                // Refresh per-device listeners — most relevant if device list changed,
+                // but cheap enough to also re-affirm when default switches.
+                self?.registerAllInputRunningListeners()
             }
         }
         
@@ -578,14 +622,13 @@ class AudioDeviceManager: AudioDeviceManaging {
             defaultOutputListenerBlock!
         )
 
-        // Running state listener on default input device
-        if let deviceID = getDefaultDeviceID(isInput: true) {
-            registerInputRunningListener(deviceID: deviceID)
-        }
+        // Running state listeners on ALL real input devices so we catch
+        // mic-in-use changes regardless of which device is the current default.
+        registerAllInputRunningListeners()
     }
 
     private func removeListeners() {
-        unregisterInputRunningListener()
+        unregisterAllInputRunningListeners()
 
         var devicesAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,

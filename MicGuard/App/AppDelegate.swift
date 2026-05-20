@@ -27,7 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - App Lifecycle
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSLog("[MicGuard.App] === BUILD MARKER 2026-05-15-diag1 — launching ===")
+        MGLog.debug("[MicGuard.App] === BUILD MARKER 2026-05-15-diag1 — launching ===")
         // Initialize core audio manager
         audioDeviceManager = AudioDeviceManager()
         
@@ -70,8 +70,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupDeviceWatchdog() {
         guard let audioManager = audioDeviceManager else { return }
-        
+
         deviceWatchdog = DeviceWatchdog(audioDeviceManager: audioManager)
+        deviceWatchdog?.autoYieldEnabled = preferencesManager.autoYieldOnRepeatedOverride
+        deviceWatchdog?.autoResumeEnabled = preferencesManager.autoResumeOnTopPriorityPick
 
         // Wire up name-based device matching
         deviceWatchdog?.nameForUID = { [weak self] uid in
@@ -81,21 +83,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.preferencesManager.replaceDeviceUID(oldUID: oldUID, newUID: newUID)
         }
 
-        deviceWatchdog?.onDeviceHijackBlocked = { [weak self] _, _ in
+        deviceWatchdog?.onDeviceHijackBlocked = { [weak self] from, to in
+            MGLog.debug("[MicGuard.AppDelegate] INPUT HELD — reverted from \(from) to \(to)")
             self?.statsManager.increment(stat: .hijacksBlocked)
-            self?.statusBarController?.flashOnAirIndicator()
+            self?.statusBarController?.flashLabel("INPUT HELD")
+        }
+
+        deviceWatchdog?.onYielded = { [weak self] accepted, _ in
+            MGLog.debug("[MicGuard.AppDelegate] INPUT CHANGED — yielded to \(accepted)")
+            self?.statusBarController?.flashLabel("INPUT CHANGED", background: .systemGreen)
+        }
+
+        deviceWatchdog?.onProtectionResumed = { [weak self] in
+            MGLog.debug("[MicGuard.AppDelegate] INPUT LOCK ON — protection resumed")
+            self?.statusBarController?.flashLabel("INPUT LOCK ON", background: .systemGreen)
         }
 
         deviceWatchdog?.onDeviceMatchAmbiguous = { _, _ in
             // Ambiguous name match — multiple devices share the same name
-        }
-
-        deviceWatchdog?.onManualChangePaused = { [weak self] in
-            self?.statusBarController?.flashOnAirIndicator()
-        }
-
-        deviceWatchdog?.onPauseResumed = { [weak self] in
-            self?.statusBarController?.flashOnAirIndicator()
         }
     }
     
@@ -103,6 +108,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let audioManager = audioDeviceManager else { return }
 
         outputDeviceWatchdog = OutputDeviceWatchdog(audioDeviceManager: audioManager)
+        outputDeviceWatchdog?.autoYieldEnabled = preferencesManager.autoYieldOnRepeatedOverride
+        outputDeviceWatchdog?.autoResumeEnabled = preferencesManager.autoResumeOnTopPriorityPick
 
         outputDeviceWatchdog?.nameForUID = { [weak self] uid in
             self?.preferencesManager.cachedDeviceName(for: uid)
@@ -111,21 +118,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.preferencesManager.replaceOutputDeviceUID(oldUID: oldUID, newUID: newUID)
         }
 
-        outputDeviceWatchdog?.onDeviceHijackBlocked = { [weak self] _, _ in
+        outputDeviceWatchdog?.onDeviceHijackBlocked = { [weak self] from, to in
+            MGLog.debug("[MicGuard.AppDelegate] OUTPUT HELD — reverted from \(from) to \(to)")
             self?.statsManager.increment(stat: .outputHijacksBlocked)
-            self?.statusBarController?.flashOnAirIndicator()
+            self?.statusBarController?.flashLabel("OUTPUT HELD")
+        }
+
+        outputDeviceWatchdog?.onYielded = { [weak self] accepted, _ in
+            MGLog.debug("[MicGuard.AppDelegate] OUTPUT CHANGED — yielded to \(accepted)")
+            self?.statusBarController?.flashLabel("OUTPUT CHANGED", background: .systemGreen)
+        }
+
+        outputDeviceWatchdog?.onProtectionResumed = { [weak self] in
+            MGLog.debug("[MicGuard.AppDelegate] OUTPUT LOCK ON — protection resumed")
+            self?.statusBarController?.flashLabel("OUTPUT LOCK ON", background: .systemGreen)
         }
 
         outputDeviceWatchdog?.onDeviceMatchAmbiguous = { _, _ in
             // Ambiguous name match — multiple output devices share the same name
-        }
-
-        outputDeviceWatchdog?.onManualChangePaused = { [weak self] in
-            self?.statusBarController?.flashOnAirIndicator()
-        }
-
-        outputDeviceWatchdog?.onPauseResumed = { [weak self] in
-            self?.statusBarController?.flashOnAirIndicator()
         }
     }
 
@@ -136,22 +146,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         volumeGuard?.onVolumeCorrected = { [weak self] _, _ in
             self?.statsManager.increment(stat: .volumeCorrections)
-        }
-
-        volumeGuard?.onManualVolumeChangeDetected = { [weak self] in
-            self?.statusBarController?.flashOnAirIndicator()
-        }
-
-        volumeGuard?.onThrottleStateChanged = { [weak self] isThrottled in
-            if isThrottled {
-                self?.statusBarController?.flashOnAirIndicator()
-            }
+            self?.statusBarController?.pulseIcon()
         }
     }
     
     private func setupActivityMonitor() {
         guard let audioManager = audioDeviceManager else { return }
-        
+
         activityMonitor = ActivityMonitor(audioDeviceManager: audioManager)
         
         // Listen to meeting end events
@@ -172,17 +173,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func applyStoredPreferences() {
-        NSLog("[MicGuard.App] applyStoredPreferences: lockEnabled=\(preferencesManager.inputDeviceLockEnabled) priority=\(preferencesManager.preferredInputDeviceOrder)")
+        MGLog.debug("[MicGuard.App] applyStoredPreferences: lockEnabled=\(preferencesManager.inputDeviceLockEnabled) priority=\(preferencesManager.preferredInputDeviceOrder)")
         // Apply input device lock if enabled
         if preferencesManager.inputDeviceLockEnabled {
             let priorityOrder = preferencesManager.preferredInputDeviceOrder
             if !priorityOrder.isEmpty {
                 deviceWatchdog?.startWatching(devicePriorityOrder: priorityOrder)
             } else {
-                NSLog("[MicGuard.App] applyStoredPreferences: lock enabled but priority is empty — watchdog NOT started")
+                MGLog.debug("[MicGuard.App] applyStoredPreferences: lock enabled but priority is empty — watchdog NOT started")
             }
         } else {
-            NSLog("[MicGuard.App] applyStoredPreferences: lock is DISABLED — watchdog NOT started")
+            MGLog.debug("[MicGuard.App] applyStoredPreferences: lock is DISABLED — watchdog NOT started")
         }
         updateActivityMonitorDeviceOverride()
 
@@ -222,7 +223,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioDeviceManager?.devicesChangedPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
+                self?.handleInputAutoSwitch()
                 self?.handleOutputAutoSwitch()
+            }
+            .store(in: &cancellables)
+
+        // User clicked Re-apply in the popover — clear any yielded watchdog state.
+        NotificationCenter.default.publisher(for: .userRequestedResumeInputProtection)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.deviceWatchdog?.resumeProtection()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .userRequestedResumeOutputProtection)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.outputDeviceWatchdog?.resumeProtection()
+            }
+            .store(in: &cancellables)
+
+        // Apply per-device output volume when the system output changes.
+        // Set-once-on-activation semantic: we nudge the device's volume to the
+        // user's saved default exactly once when it becomes the default output,
+        // then leave it alone (no continuous enforcement). Lets users have
+        // wildly different speakers without manually balancing every switch.
+        audioDeviceManager?.defaultOutputChangedPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] device in
+                self?.applyDefaultVolumeIfSet(for: device)
             }
             .store(in: &cancellables)
 
@@ -272,6 +301,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    private func handleInputAutoSwitch() {
+        guard preferencesManager.inputAutoSwitchEnabled,
+              let audioManager = audioDeviceManager else { return }
+
+        let priorityOrder = preferencesManager.preferredInputDeviceOrder
+        guard !priorityOrder.isEmpty else { return }
+
+        var bestDevice: AudioDevice?
+        for uid in priorityOrder {
+            if let device = audioManager.device(forUID: uid), device.isInput {
+                bestDevice = device
+                break
+            }
+            if let name = preferencesManager.cachedDeviceName(for: uid) {
+                let matches = audioManager.inputDevices(withName: name)
+                if matches.count == 1 {
+                    bestDevice = matches[0]
+                    preferencesManager.replaceDeviceUID(oldUID: uid, newUID: matches[0].uid)
+                    break
+                }
+            }
+        }
+
+        guard let target = bestDevice,
+              let current = audioManager.defaultInputDevice,
+              current.uid != target.uid else { return }
+
+        MGLog.debug("[MicGuard.AppDelegate] INPUT HELD (auto-switch) — \(current.name) → \(target.name)")
+        _ = audioManager.setDefaultInputDevice(target)
+        statsManager.increment(stat: .hijacksBlocked)
+        statusBarController?.flashLabel("INPUT HELD")
+    }
+
+    private func applyDefaultVolumeIfSet(for device: AudioDevice?) {
+        guard let device = device,
+              let manager = audioDeviceManager,
+              let target = preferencesManager.outputDeviceVolume(for: device.uid) else { return }
+        let ok = manager.setOutputVolume(target, for: device)
+        MGLog.debug("[MicGuard.AppDelegate] applied per-device output volume \(Int(target * 100))% to \(device.name) ok=\(ok)")
+    }
+
     private func handleOutputAutoSwitch() {
         guard preferencesManager.outputAutoSwitchEnabled,
               let audioManager = audioDeviceManager else { return }
@@ -301,9 +371,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
               let current = audioManager.defaultOutputDevice,
               current.uid != target.uid else { return }
 
+        MGLog.debug("[MicGuard.AppDelegate] OUTPUT HELD (auto-switch) — \(current.name) → \(target.name)")
         _ = audioManager.setDefaultOutputDevice(target)
         statsManager.increment(stat: .outputHijacksBlocked)
-        statusBarController?.flashOnAirIndicator()
+        statusBarController?.flashLabel("OUTPUT HELD")
     }
 
     /// Tells ActivityMonitor which device to treat as the "in use" source for the On Air indicator.
@@ -312,25 +383,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateActivityMonitorDeviceOverride() {
         guard preferencesManager.inputDeviceLockEnabled else {
             activityMonitor?.overrideMonitoredDevice = nil
-            NSLog("[MicGuard.App] override cleared (lock disabled)")
+            MGLog.debug("[MicGuard.App] override cleared (lock disabled)")
             return
         }
         let priorityOrder = preferencesManager.preferredInputDeviceOrder
         for uid in priorityOrder {
             if let device = audioDeviceManager?.device(forUID: uid), device.isInput {
                 activityMonitor?.overrideMonitoredDevice = device
-                NSLog("[MicGuard.App] override set to \(device.name)")
+                MGLog.debug("[MicGuard.App] override set to \(device.name)")
                 return
             }
             if let name = preferencesManager.cachedDeviceName(for: uid),
                let device = audioDeviceManager?.inputDevices(withName: name).first {
                 activityMonitor?.overrideMonitoredDevice = device
-                NSLog("[MicGuard.App] override set to \(device.name) (name-matched)")
+                MGLog.debug("[MicGuard.App] override set to \(device.name) (name-matched)")
                 return
             }
         }
         activityMonitor?.overrideMonitoredDevice = nil
-        NSLog("[MicGuard.App] override cleared (no preferred device available)")
+        MGLog.debug("[MicGuard.App] override cleared (no preferred device available)")
     }
 
     private func handlePreferenceChange(key: String) {
@@ -360,6 +431,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 deviceWatchdog?.stopWatching()
             }
             updateActivityMonitorDeviceOverride()
+        }
+
+        // Handle auto-yield toggle change
+        if key == "AutoYieldOnRepeatedOverride" {
+            let enabled = preferencesManager.autoYieldOnRepeatedOverride
+            deviceWatchdog?.autoYieldEnabled = enabled
+            outputDeviceWatchdog?.autoYieldEnabled = enabled
+            // Turning auto-yield off shouldn't leave a stale yielded state.
+            if !enabled {
+                deviceWatchdog?.resumeProtection()
+                outputDeviceWatchdog?.resumeProtection()
+            }
+        }
+
+        // Handle auto-resume toggle change
+        if key == "AutoResumeOnTopPriorityPick" {
+            let enabled = preferencesManager.autoResumeOnTopPriorityPick
+            deviceWatchdog?.autoResumeEnabled = enabled
+            outputDeviceWatchdog?.autoResumeEnabled = enabled
         }
 
         // Handle Output Device Lock Toggle

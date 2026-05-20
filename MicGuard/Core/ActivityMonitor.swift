@@ -15,7 +15,6 @@ protocol ActivityMonitorProtocol {
     var isMonitoring: Bool { get }
     var isMicrophoneActive: Bool { get }
     var isMicrophoneInUse: Bool { get }
-    var currentInputLevel: Float { get }
     var currentMicUsageType: MicUsageType { get }
 
     func startMonitoring()
@@ -23,7 +22,6 @@ protocol ActivityMonitorProtocol {
 
     var onMeetingStarted: (() -> Void)? { get set }
     var onMeetingEnded: (() -> Void)? { get set }
-    var inputLevelPublisher: PassthroughSubject<Float, Never> { get }
     var micInUsePublisher: PassthroughSubject<Bool, Never> { get }
     var micUsageTypePublisher: PassthroughSubject<MicUsageType, Never> { get }
 }
@@ -40,16 +38,16 @@ class ActivityMonitor: ActivityMonitorProtocol {
     private(set) var isMonitoring: Bool = false
     private(set) var isMicrophoneActive: Bool = false
     private(set) var isMicrophoneInUse: Bool = false
-    private(set) var currentInputLevel: Float = 0.0
     private(set) var currentMicUsageType: MicUsageType = .none
 
     /// When the input device lock is active, monitor this device instead of the system default.
     /// Prevents On Air indicator from disappearing when macOS briefly switches to AirPods.
     var overrideMonitoredDevice: AudioDevice?
+
     
     // Audio level tracking
     private var pollingTimer: Timer?
-    private let pollingInterval: TimeInterval = 5.0
+    private let pollingInterval: TimeInterval = 2.0
     private var lastInputLevel: Float = 0.0
     private var lastLevelChangeTime: Date = Date()
     private let micInactivityThreshold: TimeInterval = 2.0 // 2 seconds
@@ -58,9 +56,6 @@ class ActivityMonitor: ActivityMonitorProtocol {
     var onMeetingStarted: (() -> Void)?
     var onMeetingEnded: (() -> Void)?
     
-    // Publisher for input level updates
-    let inputLevelPublisher = PassthroughSubject<Float, Never>()
-
     // Publisher for mic in use state (whether an app is using the mic)
     let micInUsePublisher = PassthroughSubject<Bool, Never>()
     
@@ -130,12 +125,23 @@ class ActivityMonitor: ActivityMonitorProtocol {
     }
     
     // MARK: - Private Methods - Audio Level Polling
-    
+
+    /// Scan every real input device — return true if any is hot. Skips virtual /
+    /// aggregate transports to avoid false positives from loopback drivers
+    /// (Teams Audio, BlackHole, etc.).
+    private func checkAnyMicInUse() -> Bool {
+        for device in audioDeviceManager.inputDevices {
+            if device.isLikelyUnsettable { continue }
+            if audioDeviceManager.isDeviceRunning(device) {
+                return true
+            }
+        }
+        return false
+    }
+
     private func pollInputLevel() {
         guard isMonitoring,
               let device = overrideMonitoredDevice ?? audioDeviceManager.defaultInputDevice else {
-            currentInputLevel = 0.0
-            inputLevelPublisher.send(0.0)
             if isMicrophoneInUse {
                 isMicrophoneInUse = false
                 micInUsePublisher.send(false)
@@ -143,11 +149,10 @@ class ActivityMonitor: ActivityMonitorProtocol {
             return
         }
 
-        // Check if mic is being used by any app (device is running)
-        let isRunning = audioDeviceManager.isDeviceRunning(device)
+        let isRunning = checkAnyMicInUse()
 
         if isRunning != isMicrophoneInUse {
-            NSLog("[MicGuard.Activity] pollInputLevel polled=\(device.name) override=\(overrideMonitoredDevice?.name ?? "nil") systemDefault=\(audioDeviceManager.defaultInputDevice?.name ?? "nil") isRunning=\(isRunning) (was \(isMicrophoneInUse))")
+            MGLog.debug("[MicGuard.Activity] pollInputLevel polled=\(device.name) override=\(overrideMonitoredDevice?.name ?? "nil") systemDefault=\(audioDeviceManager.defaultInputDevice?.name ?? "nil") isRunning=\(isRunning) (was \(isMicrophoneInUse))")
             isMicrophoneInUse = isRunning
             micInUsePublisher.send(isRunning)
         }
@@ -167,16 +172,12 @@ class ActivityMonitor: ActivityMonitorProtocol {
             }
         }
 
-        // Get the current input volume level
+        // Read current input volume — used purely to detect "meeting active" vs idle
+        // by watching for level fluctuations. Not surfaced to UI.
         guard let level = audioDeviceManager.getInputVolume(for: device) else {
-            currentInputLevel = 0.0
-            inputLevelPublisher.send(0.0)
             return
         }
 
-        currentInputLevel = level
-        inputLevelPublisher.send(level)
-        
         // Check if level has changed
         let levelChanged = abs(level - lastInputLevel) > 0.001 // Tolerance for float comparison
         
