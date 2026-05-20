@@ -138,9 +138,19 @@ class MockAudioDeviceManager: AudioDeviceManaging {
     
     func setInputVolume(_ volume: Float, for device: AudioDevice) -> Bool {
         setInputVolumeCalls.append((volume: volume, device: device))
-        
+
         guard !shouldFailSetVolume else { return false }
-        
+
+        deviceVolumes[device.uid] = volume
+        return true
+    }
+
+    func getOutputVolume(for device: AudioDevice) -> Float? {
+        return deviceVolumes[device.uid]
+    }
+
+    func setOutputVolume(_ volume: Float, for device: AudioDevice) -> Bool {
+        guard !shouldFailSetVolume else { return false }
         deviceVolumes[device.uid] = volume
         return true
     }
