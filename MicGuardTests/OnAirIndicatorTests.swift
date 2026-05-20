@@ -22,6 +22,7 @@ class MockPreferencesForOnAir: PreferencesManaging {
     var micInUseIndicatorStyle: MicInUseIndicatorStyle = .orangePill
     var autoYieldOnRepeatedOverride: Bool = true
     var autoResumeOnTopPriorityPick: Bool = false
+    var hideVirtualDevices: Bool = false
     let preferencesChangedPublisher = PassthroughSubject<String, Never>()
 
     var preferredOutputDeviceUID: String?

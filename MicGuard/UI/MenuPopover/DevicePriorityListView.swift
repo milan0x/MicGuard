@@ -40,17 +40,24 @@ struct DevicePriorityListView: View {
                 }
                 .padding(.bottom, 2)
 
-                ForEach(Array(devices.enumerated()), id: \.element.id) { index, entry in
-                    DeviceRow(
-                        entry: entry,
-                        isFirst: index == 0,
-                        isLast: index == devices.count - 1,
-                        onUse: { onUse(index) },
-                        onMoveUp: { onMoveUp(index) },
-                        onMoveDown: { onMoveDown(index) },
-                        onRemove: { onRemove(index) }
-                    )
+                // Cap the visible list at ~6 rows. Beyond that, the inner ScrollView
+                // engages — keeps popover height predictable when device count is high.
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(devices.enumerated()), id: \.element.id) { index, entry in
+                            DeviceRow(
+                                entry: entry,
+                                isFirst: index == 0,
+                                isLast: index == devices.count - 1,
+                                onUse: { onUse(index) },
+                                onMoveUp: { onMoveUp(index) },
+                                onMoveDown: { onMoveDown(index) },
+                                onRemove: { onRemove(index) }
+                            )
+                        }
+                    }
                 }
+                .frame(maxHeight: 180)
             }
         }
     }

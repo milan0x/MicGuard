@@ -60,6 +60,7 @@ protocol PreferencesManaging: AnyObject {
     var micInUseIndicatorStyle: MicInUseIndicatorStyle { get set }
     var autoYieldOnRepeatedOverride: Bool { get set }
     var autoResumeOnTopPriorityPick: Bool { get set }
+    var hideVirtualDevices: Bool { get set }
 
     // Input device order management
     func moveDevice(uid: String, direction: MoveDirection)
@@ -121,6 +122,7 @@ private enum PreferenceKey: String {
     case micInUseIndicatorStyle = "MicInUseIndicatorStyle"
     case autoYieldOnRepeatedOverride = "AutoYieldOnRepeatedOverride"
     case autoResumeOnTopPriorityPick = "AutoResumeOnTopPriorityPick"
+    case hideVirtualDevices = "HideVirtualDevices"
 }
 
 // MARK: - PreferencesManager Implementation
@@ -158,7 +160,8 @@ class PreferencesManager: PreferencesManaging {
             PreferenceKey.showStats.rawValue: false,
             PreferenceKey.micInUseIndicatorStyle.rawValue: MicInUseIndicatorStyle.redTint.rawValue,
             PreferenceKey.autoYieldOnRepeatedOverride.rawValue: true,
-            PreferenceKey.autoResumeOnTopPriorityPick.rawValue: false
+            PreferenceKey.autoResumeOnTopPriorityPick.rawValue: false,
+            PreferenceKey.hideVirtualDevices.rawValue: false
         ])
     }
     
@@ -329,6 +332,14 @@ class PreferencesManager: PreferencesManaging {
         set {
             defaults.set(newValue, forKey: PreferenceKey.autoResumeOnTopPriorityPick.rawValue)
             preferencesChangedPublisher.send(PreferenceKey.autoResumeOnTopPriorityPick.rawValue)
+        }
+    }
+
+    var hideVirtualDevices: Bool {
+        get { defaults.bool(forKey: PreferenceKey.hideVirtualDevices.rawValue) }
+        set {
+            defaults.set(newValue, forKey: PreferenceKey.hideVirtualDevices.rawValue)
+            preferencesChangedPublisher.send(PreferenceKey.hideVirtualDevices.rawValue)
         }
     }
     
