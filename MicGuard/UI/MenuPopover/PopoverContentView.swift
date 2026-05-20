@@ -211,6 +211,7 @@ private struct InputSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -225,6 +226,7 @@ private struct InputSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -386,6 +388,7 @@ private struct OutputSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -400,6 +403,7 @@ private struct OutputSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -667,7 +671,9 @@ private struct SettingsSection: View {
                 get: { viewModel.launchAtLogin },
                 set: { viewModel.setLaunchAtLogin($0) }
             )) {
-                Text("Launch at login").font(.system(size: 13))
+                Text("Launch at login")
+                    .font(.system(size: 13))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -676,7 +682,9 @@ private struct SettingsSection: View {
                 get: { viewModel.showNotifications },
                 set: { viewModel.setShowNotifications($0) }
             )) {
-                Text("Show notifications").font(.system(size: 13))
+                Text("Show notifications")
+                    .font(.system(size: 13))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -685,7 +693,9 @@ private struct SettingsSection: View {
                 get: { viewModel.showStats },
                 set: { viewModel.setShowStats($0) }
             )) {
-                Text("Show stats").font(.system(size: 13))
+                Text("Show stats")
+                    .font(.system(size: 13))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -701,6 +711,7 @@ private struct SettingsSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -716,6 +727,7 @@ private struct SettingsSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -731,6 +743,7 @@ private struct SettingsSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .toggleStyle(.switch)
             .controlSize(.small)
