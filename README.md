@@ -1,19 +1,25 @@
 # MicGuard
 
-Keeps your default audio device as your default audio device. macOS switches to AirPods the moment you put them on, which also drops Bluetooth audio quality to the low-bitrate call codec. MicGuard stops that.
+Keeps your audio devices and volume the way you set them. macOS switches to AirPods the moment you put them on, drops audio to the low-bitrate call codec, and conference apps like Zoom / Meet mess with your mic volume via auto gain. MicGuard stops both.
 
-Also handles volume - conference apps like Zoom and Meet mess with your mic volume via auto gain control. MicGuard keeps it where you set it.
-
-Vibe-coded macOS menu bar app. Swift, no external dependencies, no network access.
+Vibe-coded macOS menu bar app. Swift + SwiftUI, no external dependencies, no network access, no microphone permission required.
 
 ![MicGuard menu bar UI](ss1.png)
 
-## Features
+## What it does
 
-- Lock preferred input/output device
-- Lock mic volume or auto-reset after meetings
-- Auto-switch output when preferred device connects
-- ON AIR indicator when mic is active
+**Devices** — pin your input and output device, or let MicGuard pick the top connected device from a priority list. macOS won't be able to silently switch you away. When a higher-priority device plugs in, MicGuard can auto-switch to it (opt-in).
+
+**Volume** — three strategies for input volume:
+- *None* — don't manage
+- *Lock volume* — continuous protection, snap back to target whenever something nudges it
+- *Reset when mic stops* — restore your target after each meeting ends *(default)*
+
+**Per-device output levels** — set a one-time default volume that applies whenever a specific output device becomes active. Useful when your monitor speakers are wildly louder than your headphones.
+
+**Mic-in-use indicator** — when any mic is hot, the menu bar mic icon switches to a colored pill (orange pill matches macOS native, red pill for higher visibility, or off if you trust macOS's own orange dot).
+
+**Prevention flashes** — when MicGuard reverts a hijack, the menu bar briefly flashes `INPUT HELD` or `OUTPUT HELD` so you know it acted on your behalf.
 
 ## Install
 
@@ -23,12 +29,16 @@ Or build it yourself:
 
 ```bash
 swift build
-# or open MicGuard.xcodeproj in Xcode
+# or open the package in Xcode
 ```
 
 ## Privacy
 
 Nothing leaves your machine. No analytics, no mic access — MicGuard uses CoreAudio device metadata only, so macOS never prompts for microphone permission.
+
+## Requirements
+
+macOS 13 Ventura or later.
 
 ## License
 

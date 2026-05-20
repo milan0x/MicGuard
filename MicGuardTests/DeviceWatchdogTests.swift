@@ -413,22 +413,4 @@ final class DeviceWatchdogTests: XCTestCase {
         XCTAssertFalse(ambiguousCalled, "Should not fire ambiguous callback for single name match")
     }
 
-    // MARK: - Manual Change Pause Tests
-
-    func testPauseStateInitiallyFalse() {
-        XCTAssertFalse(watchdog.isPaused)
-    }
-
-    // Note: Manual change pause (isPaused) is triggered by isSystemSettingsFrontmost()
-    // which depends on NSWorkspace.shared and cannot be mocked in unit tests.
-    // The pause mechanism is tested through integration testing.
-
-    func testStopWatchingClearsPause() {
-        let preferredDevice = mockAudioManager.inputDevices.first { $0.uid == "ShureMV7" }!
-        watchdog.startWatching(devicePriorityOrder: [preferredDevice.uid])
-
-        // After stopping, pause should be cleared
-        watchdog.stopWatching()
-        XCTAssertFalse(watchdog.isPaused, "Pause should be cleared when watching stops")
-    }
 }

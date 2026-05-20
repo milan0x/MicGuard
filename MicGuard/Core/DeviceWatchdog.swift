@@ -13,7 +13,6 @@ import AppKit
 
 protocol DeviceWatchdogProtocol {
     var isWatching: Bool { get }
-    var isPaused: Bool { get }
     var devicePriorityOrder: [String] { get }
 
     func startWatching(devicePriorityOrder: [String])
@@ -21,6 +20,12 @@ protocol DeviceWatchdogProtocol {
     func updateDevicePriorityOrder(_ order: [String])
 
     var onDeviceHijackBlocked: ((String, String) -> Void)? { get set }
+    /// Fires when the watchdog yields after repeated user overrides: (acceptedDeviceName, formerPreferred).
+    /// Caller should surface "INPUT/OUTPUT CHANGED" feedback and expose a way to resume.
+    var onYielded: ((String, String) -> Void)? { get set }
+    /// Fires when the watchdog transitions from yielded → protecting again.
+    /// Whether triggered by user (Re-apply) or auto-resume, caller can flash "LOCK ON".
+    var onProtectionResumed: (() -> Void)? { get set }
 
     /// Resolves a cached name for a given UID (provided by PreferencesManager)
     var nameForUID: ((String) -> String?)? { get set }
@@ -28,10 +33,9 @@ protocol DeviceWatchdogProtocol {
     var onDeviceUIDUpdated: ((String, String) -> Void)? { get set }
     /// Called when multiple devices share the same name, making name-based matching ambiguous: (name, count)
     var onDeviceMatchAmbiguous: ((String, Int) -> Void)? { get set }
-    /// Called when enforcement is paused due to manual change in System Settings
-    var onManualChangePaused: (() -> Void)? { get set }
-    /// Called when enforcement resumes after a manual change pause
-    var onPauseResumed: (() -> Void)? { get set }
+
+    /// Clear the yielded state and resume enforcement immediately.
+    func resumeProtection()
 }
 
 // MARK: - BaseDeviceWatchdog
@@ -46,17 +50,11 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     var cancellables = Set<AnyCancellable>()
 
     private(set) var isWatching: Bool = false
-    private(set) var isPaused: Bool = false
     private(set) var preferredDeviceUID: String?
     private(set) var devicePriorityOrder: [String] = []
 
     private var debounceWorkItem: DispatchWorkItem?
     private let debounceInterval: TimeInterval
-
-    // Manual change pause mechanism
-    private let pauseDuration: TimeInterval
-    private var pauseTimer: DispatchWorkItem?
-    private var appDeactivationObserver: NSObjectProtocol?
 
     // Periodic verification: macOS (especially Bluetooth/AirPods routing) can switch the default
     // device without reliably firing kAudioHardwarePropertyDefaultInputDevice. Poll every 3s as
@@ -65,11 +63,24 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     private let verificationInterval: TimeInterval = 3.0
 
     var onDeviceHijackBlocked: ((String, String) -> Void)?
+    var onYielded: ((String, String) -> Void)?
+    var onProtectionResumed: (() -> Void)?
     var nameForUID: ((String) -> String?)?
     var onDeviceUIDUpdated: ((String, String) -> Void)?
     var onDeviceMatchAmbiguous: ((String, Int) -> Void)?
-    var onManualChangePaused: (() -> Void)?
-    var onPauseResumed: (() -> Void)?
+
+    // Yield-after-N-hijacks: when the user fights us repeatedly, stop fighting back.
+    // Lets them deliberately use a non-preferred device without MicGuard nagging.
+    /// When false, the watchdog always reverts — never yields. Set from preference.
+    var autoYieldEnabled: Bool = true
+    /// When true, the watchdog auto-resumes from yielded state the moment the user
+    /// picks the top-priority device (from anywhere — System Settings, popover, etc).
+    var autoResumeEnabled: Bool = false
+    private(set) var isYielded: Bool = false
+    private var recentHijackTimestamps: [Date] = []
+    private let yieldThresholdCount: Int = 2
+    private let yieldWindow: TimeInterval = 10.0
+    private let yieldMinSpread: TimeInterval = 1.0  // filters out Bluetooth flap storms
 
     // MARK: - Direction hooks (set by subclasses)
 
@@ -81,10 +92,9 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
 
     // MARK: - Initialization
 
-    init(audioDeviceManager: AudioDeviceManaging, debounceInterval: TimeInterval = 0.1, pauseDuration: TimeInterval = 300) {
+    init(audioDeviceManager: AudioDeviceManaging, debounceInterval: TimeInterval = 0.1) {
         self.audioDeviceManager = audioDeviceManager
         self.debounceInterval = debounceInterval
-        self.pauseDuration = pauseDuration
     }
 
     // MARK: - Public Methods
@@ -93,10 +103,10 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
         self.devicePriorityOrder = devicePriorityOrder
         self.preferredDeviceUID = devicePriorityOrder.first
 
-        NSLog("[MicGuard.Watchdog] startWatching priority=\(devicePriorityOrder)")
+        MGLog.debug("[MicGuard.Watchdog] startWatching priority=\(devicePriorityOrder)")
 
         guard !isWatching else {
-            NSLog("[MicGuard.Watchdog] startWatching: already watching, only priority updated")
+            MGLog.debug("[MicGuard.Watchdog] startWatching: already watching, only priority updated")
             return
         }
         isWatching = true
@@ -119,7 +129,8 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
 
     func stopWatching() {
         isWatching = false
-        resumeFromPause()
+        isYielded = false
+        recentHijackTimestamps.removeAll()
         cancellables.removeAll()
         debounceWorkItem?.cancel()
         debounceWorkItem = nil
@@ -142,50 +153,85 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     // MARK: - Device Change Handling
 
     private func handleDeviceChange(newDevice: AudioDevice?) {
-        NSLog("[MicGuard.Watchdog] handleDeviceChange newDevice=\(newDevice?.name ?? "nil") isWatching=\(isWatching) isPaused=\(isPaused)")
+        MGLog.debug("[MicGuard.Watchdog] handleDeviceChange newDevice=\(newDevice?.name ?? "nil") isWatching=\(isWatching) isYielded=\(isYielded)")
 
         guard isWatching else { return }
 
-        // If user is manually changing device in System Settings, pause enforcement
-        if isSystemSettingsFrontmost() {
-            NSLog("[MicGuard.Watchdog] handleDeviceChange: System Settings frontmost, pausing")
-            startPause()
+        // While yielded: check whether the user just navigated back to the top-priority
+        // device. If so AND auto-resume is enabled, exit yielded state and resume
+        // enforcement. The user's action signals they've "come home" to their preferred.
+        if isYielded {
+            if autoResumeEnabled,
+               let best = selectBestDevice(),
+               newDevice?.uid == best.uid {
+                MGLog.debug("[MicGuard.Watchdog] auto-resume: user picked top-priority \(best.name)")
+                resumeProtection()
+            }
             return
         }
 
-        // If paused, a non-manual device change (e.g., AirPods connecting) resumes enforcement
-        if isPaused {
-            resumeFromPause()
-        }
+        // Always enforce — including when System Settings is frontmost.
+        // Lock means "hold the priority device, period." If the user wants to switch,
+        // they can do so via MicGuard's popover (which calls setDefault directly,
+        // bypassing this enforcement path because the new device becomes #1 priority).
 
         guard let bestDevice = selectBestDevice() else {
-            NSLog("[MicGuard.Watchdog] handleDeviceChange: selectBestDevice returned nil — priority=\(devicePriorityOrder)")
+            MGLog.debug("[MicGuard.Watchdog] handleDeviceChange: selectBestDevice returned nil — priority=\(devicePriorityOrder)")
             return
         }
 
-        NSLog("[MicGuard.Watchdog] handleDeviceChange bestDevice=\(bestDevice.name) priorityOrder=\(devicePriorityOrder)")
+        MGLog.debug("[MicGuard.Watchdog] handleDeviceChange bestDevice=\(bestDevice.name) priorityOrder=\(devicePriorityOrder)")
 
-        // Enforce immediately when the new default isn't our preferred device.
-        // Previously this was debounced, but each rapid-fire macOS event (AirPods HFP/AAC
-        // mode switches, re-overrides) would cancel the pending work item and reschedule —
-        // starving enforcement when events arrived faster than the debounce interval.
+        // If the user has changed the default away from our preferred device, see
+        // whether they've done it repeatedly. If so, yield instead of fighting.
         if newDevice?.uid != bestDevice.uid {
+            if shouldYieldToRepeatedOverride() {
+                isYielded = true
+                recentHijackTimestamps.removeAll()
+                MGLog.debug("[MicGuard.Watchdog] yielding — user changed default repeatedly")
+                onYielded?(newDevice?.name ?? "Unknown", bestDevice.name)
+                return
+            }
+            enforcePreferredDevice()
+        }
+    }
+
+    /// Returns true when the user has manually overridden the default ≥ N times
+    /// inside the yieldWindow, with at least `yieldMinSpread` between events
+    /// (filters out millisecond-fast Bluetooth flap storms).
+    /// Returns false when `autoYieldEnabled` is off — caller will always revert.
+    private func shouldYieldToRepeatedOverride() -> Bool {
+        guard autoYieldEnabled else { return false }
+
+        let now = Date()
+        recentHijackTimestamps.removeAll { now.timeIntervalSince($0) > yieldWindow }
+
+        // Ignore events that fire too fast after the last one — that's Bluetooth, not a user.
+        if let last = recentHijackTimestamps.last, now.timeIntervalSince(last) < yieldMinSpread {
+            return false
+        }
+        recentHijackTimestamps.append(now)
+        return recentHijackTimestamps.count >= yieldThresholdCount
+    }
+
+    func resumeProtection() {
+        guard isYielded else { return }
+        MGLog.debug("[MicGuard.Watchdog] resumeProtection — clearing yield state")
+        isYielded = false
+        recentHijackTimestamps.removeAll()
+        onProtectionResumed?()
+        if isWatching {
             enforcePreferredDevice()
         }
     }
 
     func handleDeviceListChange() {
-        NSLog("[MicGuard.Watchdog] handleDeviceListChange isWatching=\(isWatching)")
-        guard isWatching else { return }
-
-        // A device list change (connect/disconnect) while paused resumes enforcement
-        if isPaused {
-            resumeFromPause()
-        }
+        MGLog.debug("[MicGuard.Watchdog] handleDeviceListChange isWatching=\(isWatching)")
+        guard isWatching, !isYielded else { return }
 
         if let bestDevice = selectBestDevice() {
             let currentDefault = getDefaultDevice()
-            NSLog("[MicGuard.Watchdog] handleDeviceListChange best=\(bestDevice.name) current=\(currentDefault?.name ?? "nil")")
+            MGLog.debug("[MicGuard.Watchdog] handleDeviceListChange best=\(bestDevice.name) current=\(currentDefault?.name ?? "nil")")
             if currentDefault?.uid != bestDevice.uid {
                 enforcePreferredDevice()
             }
@@ -201,7 +247,7 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     private func scheduleDelayedCheck(after delay: TimeInterval) {
         // One-shot timer in .common mode so it fires even while NSMenu is tracking.
         let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
-            guard let self = self, self.isWatching, !self.isPaused else { return }
+            guard let self = self, self.isWatching, !self.isYielded else { return }
             guard let bestDevice = self.selectBestDevice() else { return }
             let currentDefault = self.getDefaultDevice()
             if currentDefault?.uid != bestDevice.uid {
@@ -212,31 +258,31 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     }
 
     func enforcePreferredDevice() {
-        guard !isPaused else {
-            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: paused, skipping")
+        guard !isYielded else {
+            MGLog.debug("[MicGuard.Watchdog] enforcePreferredDevice: yielded, skipping")
             return
         }
         guard let bestDevice = selectBestDevice() else {
-            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: no best device, skipping")
+            MGLog.debug("[MicGuard.Watchdog] enforcePreferredDevice: no best device, skipping")
             return
         }
 
         let currentDefault = getDefaultDevice()
         guard currentDefault?.uid != bestDevice.uid else {
-            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: already on \(bestDevice.name), nothing to do")
+            MGLog.debug("[MicGuard.Watchdog] enforcePreferredDevice: already on \(bestDevice.name), nothing to do")
             return
         }
 
         let attemptedDeviceName = currentDefault?.name ?? "Unknown"
-        NSLog("[MicGuard.Watchdog] enforcePreferredDevice: switching from \(attemptedDeviceName) to \(bestDevice.name)")
+        MGLog.debug("[MicGuard.Watchdog] enforcePreferredDevice: switching from \(attemptedDeviceName) to \(bestDevice.name)")
 
         let setResult = setDefaultDevice(bestDevice)
-        NSLog("[MicGuard.Watchdog] enforcePreferredDevice: setDefaultDevice returned \(setResult)")
+        MGLog.debug("[MicGuard.Watchdog] enforcePreferredDevice: setDefaultDevice returned \(setResult)")
 
         if setResult {
             // Verify immediately whether the change actually stuck at the CoreAudio layer.
             let verifyDefault = getDefaultDevice()
-            NSLog("[MicGuard.Watchdog] enforcePreferredDevice: post-set verification, currentDefault=\(verifyDefault?.name ?? "nil")")
+            MGLog.debug("[MicGuard.Watchdog] enforcePreferredDevice: post-set verification, currentDefault=\(verifyDefault?.name ?? "nil")")
 
             onDeviceHijackBlocked?(attemptedDeviceName, bestDevice.name)
             // macOS (especially with AirPods) can re-override within milliseconds.
@@ -247,7 +293,7 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
 
     private func scheduleEnforcementVerification() {
         let timer = Timer(timeInterval: 0.4, repeats: false) { [weak self] _ in
-            guard let self = self, self.isWatching, !self.isPaused else { return }
+            guard let self = self, self.isWatching, !self.isYielded else { return }
             guard let bestDevice = self.selectBestDevice() else { return }
             let currentDefault = self.getDefaultDevice()
             if currentDefault?.uid != bestDevice.uid {
@@ -263,86 +309,22 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
         // Timer.scheduledTimer uses .defaultRunLoopMode which is suspended during menu display.
         let timer = Timer(timeInterval: verificationInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            guard self.isWatching, !self.isPaused else { return }
+            guard self.isWatching, !self.isYielded else { return }
             guard let bestDevice = self.selectBestDevice() else { return }
             let currentDefault = self.getDefaultDevice()
             if currentDefault?.uid != bestDevice.uid {
-                NSLog("[MicGuard.Watchdog] verificationTimer: drift detected, current=\(currentDefault?.name ?? "nil") best=\(bestDevice.name)")
+                MGLog.debug("[MicGuard.Watchdog] verificationTimer: drift detected, current=\(currentDefault?.name ?? "nil") best=\(bestDevice.name)")
                 self.enforcePreferredDevice()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         verificationTimer = timer
-        NSLog("[MicGuard.Watchdog] verificationTimer started (\(verificationInterval)s interval, .common mode)")
+        MGLog.debug("[MicGuard.Watchdog] verificationTimer started (\(verificationInterval)s interval, .common mode)")
     }
 
     private func stopVerificationTimer() {
         verificationTimer?.invalidate()
         verificationTimer = nil
-    }
-
-    // MARK: - Manual Change Pause
-
-    private func startPause() {
-        guard !isPaused else { return }
-        isPaused = true
-
-        // Cancel any pending enforcement
-        debounceWorkItem?.cancel()
-        debounceWorkItem = nil
-
-        onManualChangePaused?()
-
-        // Schedule timeout to resume
-        pauseTimer?.cancel()
-        let timer = DispatchWorkItem { [weak self] in
-            self?.resumeFromPause()
-        }
-        pauseTimer = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + pauseDuration, execute: timer)
-
-        // Also resume when System Settings loses focus
-        appDeactivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let self = self, self.isPaused else { return }
-            // If the newly activated app is NOT System Settings, resume
-            if !self.isSystemSettingsFrontmost() {
-                self.resumeFromPause()
-            }
-        }
-    }
-
-    private func resumeFromPause() {
-        let wasPaused = isPaused
-        isPaused = false
-        pauseTimer?.cancel()
-        pauseTimer = nil
-
-        if let observer = appDeactivationObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-            appDeactivationObserver = nil
-        }
-
-        if wasPaused {
-            onPauseResumed?()
-            // Re-enforce after resuming
-            if isWatching {
-                enforcePreferredDevice()
-            }
-        }
-    }
-
-    // MARK: - Helper Methods
-
-    private func isSystemSettingsFrontmost() -> Bool {
-        guard let frontmost = NSWorkspace.shared.frontmostApplication,
-              let bundleId = frontmost.bundleIdentifier else { return false }
-
-        return bundleId == "com.apple.systempreferences" ||  // macOS 12 and earlier
-               bundleId == "com.apple.Settings"              // macOS 13+
     }
 
     // MARK: - Name-Based Matching Helpers
@@ -376,8 +358,8 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
 
 class DeviceWatchdog: BaseDeviceWatchdog {
 
-    override init(audioDeviceManager: AudioDeviceManaging, debounceInterval: TimeInterval = 0.1, pauseDuration: TimeInterval = 300) {
-        super.init(audioDeviceManager: audioDeviceManager, debounceInterval: debounceInterval, pauseDuration: pauseDuration)
+    override init(audioDeviceManager: AudioDeviceManaging, debounceInterval: TimeInterval = 0.1) {
+        super.init(audioDeviceManager: audioDeviceManager, debounceInterval: debounceInterval)
 
         deviceChangedPublisher = { [unowned self] in self.audioDeviceManager.defaultInputChangedPublisher }
         getDefaultDevice = { [unowned self] in self.audioDeviceManager.defaultInputDevice }
@@ -402,8 +384,8 @@ class DeviceWatchdog: BaseDeviceWatchdog {
 
 class OutputDeviceWatchdog: BaseDeviceWatchdog {
 
-    override init(audioDeviceManager: AudioDeviceManaging, debounceInterval: TimeInterval = 0.1, pauseDuration: TimeInterval = 300) {
-        super.init(audioDeviceManager: audioDeviceManager, debounceInterval: debounceInterval, pauseDuration: pauseDuration)
+    override init(audioDeviceManager: AudioDeviceManaging, debounceInterval: TimeInterval = 0.1) {
+        super.init(audioDeviceManager: audioDeviceManager, debounceInterval: debounceInterval)
 
         deviceChangedPublisher = { [unowned self] in self.audioDeviceManager.defaultOutputChangedPublisher }
         getDefaultDevice = { [unowned self] in self.audioDeviceManager.defaultOutputDevice }
