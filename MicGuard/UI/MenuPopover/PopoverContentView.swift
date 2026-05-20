@@ -720,6 +720,21 @@ private struct SettingsSection: View {
             .toggleStyle(.switch)
             .controlSize(.small)
 
+            Toggle(isOn: Binding(
+                get: { viewModel.hideVirtualDevices },
+                set: { viewModel.setHideVirtualDevices($0) }
+            )) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Hide virtual devices")
+                        .font(.system(size: 13))
+                    Text("Excludes loopback / aggregate devices from the priority lists")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+
             MicIndicatorPicker(viewModel: viewModel)
                 .padding(.top, 4)
         }

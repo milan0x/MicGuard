@@ -68,6 +68,7 @@ final class PopoverViewModel: ObservableObject {
     @Published var micInUseIndicatorStyle: MicInUseIndicatorStyle = .orangePill
     @Published var autoYieldOnRepeatedOverride: Bool = true
     @Published var autoResumeOnTopPriorityPick: Bool = false
+    @Published var hideVirtualDevices: Bool = false
 
     @Published var stats: [StatType: Int] = [:]
 
@@ -164,6 +165,7 @@ final class PopoverViewModel: ObservableObject {
         micInUseIndicatorStyle = preferencesManager.micInUseIndicatorStyle
         autoYieldOnRepeatedOverride = preferencesManager.autoYieldOnRepeatedOverride
         autoResumeOnTopPriorityPick = preferencesManager.autoResumeOnTopPriorityPick
+        hideVirtualDevices = preferencesManager.hideVirtualDevices
 
         if !suppressVolumePublish {
             targetVolume = preferencesManager.targetVolume
@@ -186,6 +188,7 @@ final class PopoverViewModel: ObservableObject {
         micInUseIndicatorStyle = preferencesManager.micInUseIndicatorStyle
         autoYieldOnRepeatedOverride = preferencesManager.autoYieldOnRepeatedOverride
         autoResumeOnTopPriorityPick = preferencesManager.autoResumeOnTopPriorityPick
+        hideVirtualDevices = preferencesManager.hideVirtualDevices
         refreshDeviceLists()
         refreshStatusLine()
         refreshStats()
@@ -308,7 +311,7 @@ final class PopoverViewModel: ObservableObject {
             }
         }
 
-        return ordered.enumerated().map { index, entry in
+        let allEntries: [DeviceEntry] = ordered.enumerated().map { index, entry in
             let isConnected = entry.device != nil
             let baseName: String
             if let device = entry.device {
@@ -327,6 +330,15 @@ final class PopoverViewModel: ObservableObject {
                 unsettable: unsettableUIDs.contains(entry.uid) || likelyUnsettable
             )
         }
+
+        // When the "hide virtual devices" toggle is on, filter virtual/aggregate
+        // entries from the display. The stored priority order is untouched —
+        // priority numbers remain the stored positions (so "#3" still means
+        // 3rd in the actual order even if a virtual #2 is hidden between).
+        if hideVirtualDevices {
+            return allEntries.filter { !$0.unsettable }
+        }
+        return allEntries
     }
 
     // MARK: - Actions: Input
@@ -342,25 +354,40 @@ final class PopoverViewModel: ObservableObject {
         inputAutoSwitchEnabled = enabled
     }
 
-    func moveInputDevice(at index: Int, direction: MoveDirection) {
-        let order = preferencesManager.preferredInputDeviceOrder
-        guard index >= 0, index < order.count else { return }
-        let uid = order[index]
+    /// `displayedIndex` is the row index in the filtered `inputDevices` array.
+    /// Move logic is displayed-aware: swaps with the previous/next *visible* row
+    /// so the UI behavior is intuitive even when virtual devices are hidden.
+    func moveInputDevice(at displayedIndex: Int, direction: MoveDirection) {
+        guard displayedIndex >= 0, displayedIndex < inputDevices.count else { return }
+        let uid = inputDevices[displayedIndex].id
+        var newOrder = preferencesManager.preferredInputDeviceOrder
+        guard let currentIdx = newOrder.firstIndex(of: uid) else { return }
+
         switch direction {
-        case .up where index == 0: return
-        case .down where index == order.count - 1: return
-        default: break
+        case .up:
+            guard displayedIndex > 0 else { return }
+            let prevUID = inputDevices[displayedIndex - 1].id
+            guard let prevIdx = newOrder.firstIndex(of: prevUID) else { return }
+            newOrder.swapAt(currentIdx, prevIdx)
+        case .down:
+            guard displayedIndex < inputDevices.count - 1 else { return }
+            let nextUID = inputDevices[displayedIndex + 1].id
+            guard let nextIdx = newOrder.firstIndex(of: nextUID) else { return }
+            newOrder.swapAt(currentIdx, nextIdx)
+        case .toTop:
+            newOrder.remove(at: currentIdx)
+            newOrder.insert(uid, at: 0)
         }
-        preferencesManager.moveDevice(uid: uid, direction: direction)
+
+        preferencesManager.preferredInputDeviceOrder = newOrder
         NotificationCenter.default.post(name: .preferredInputDeviceChanged, object: uid)
     }
 
-    func useInputDevice(at index: Int) {
-        let order = preferencesManager.preferredInputDeviceOrder
-        guard index >= 0, index < order.count else { return }
-        let uid = order[index]
+    func useInputDevice(at displayedIndex: Int) {
+        guard displayedIndex >= 0, displayedIndex < inputDevices.count else { return }
+        let uid = inputDevices[displayedIndex].id
         let before = audioDeviceManager.defaultInputDevice?.name ?? "nil"
-        MGLog.debug("[MicGuard.PopoverVM] useInputDevice CALLED index=\(index) uid=\(uid) currentDefault=\(before)")
+        MGLog.debug("[MicGuard.PopoverVM] useInputDevice CALLED displayedIndex=\(displayedIndex) uid=\(uid) currentDefault=\(before)")
 
         // Connected devices: try to make them the system default first.
         // Disconnected devices: skip the CoreAudio call, just promote priority —
@@ -379,7 +406,9 @@ final class PopoverViewModel: ObservableObject {
         }
 
         preferencesManager.preferredInputDeviceUID = uid
-        if index > 0 {
+        // Promote to top of stored order if not already #1 there.
+        let order = preferencesManager.preferredInputDeviceOrder
+        if order.first != uid {
             preferencesManager.moveDevice(uid: uid, direction: .toTop)
         }
         NotificationCenter.default.post(name: .preferredInputDeviceChanged, object: uid)
@@ -416,10 +445,9 @@ final class PopoverViewModel: ObservableObject {
         return nil
     }
 
-    func removeInputDevice(at index: Int) {
-        let order = preferencesManager.preferredInputDeviceOrder
-        guard index >= 0, index < order.count else { return }
-        let uid = order[index]
+    func removeInputDevice(at displayedIndex: Int) {
+        guard displayedIndex >= 0, displayedIndex < inputDevices.count else { return }
+        let uid = inputDevices[displayedIndex].id
         preferencesManager.removeDeviceFromOrder(uid)
         if preferencesManager.preferredInputDeviceUID == uid {
             preferencesManager.preferredInputDeviceUID = nil
@@ -440,23 +468,35 @@ final class PopoverViewModel: ObservableObject {
         outputAutoSwitchEnabled = enabled
     }
 
-    func moveOutputDevice(at index: Int, direction: MoveDirection) {
-        let order = preferencesManager.preferredOutputDeviceOrder
-        guard index >= 0, index < order.count else { return }
-        let uid = order[index]
+    func moveOutputDevice(at displayedIndex: Int, direction: MoveDirection) {
+        guard displayedIndex >= 0, displayedIndex < outputDevices.count else { return }
+        let uid = outputDevices[displayedIndex].id
+        var newOrder = preferencesManager.preferredOutputDeviceOrder
+        guard let currentIdx = newOrder.firstIndex(of: uid) else { return }
+
         switch direction {
-        case .up where index == 0: return
-        case .down where index == order.count - 1: return
-        default: break
+        case .up:
+            guard displayedIndex > 0 else { return }
+            let prevUID = outputDevices[displayedIndex - 1].id
+            guard let prevIdx = newOrder.firstIndex(of: prevUID) else { return }
+            newOrder.swapAt(currentIdx, prevIdx)
+        case .down:
+            guard displayedIndex < outputDevices.count - 1 else { return }
+            let nextUID = outputDevices[displayedIndex + 1].id
+            guard let nextIdx = newOrder.firstIndex(of: nextUID) else { return }
+            newOrder.swapAt(currentIdx, nextIdx)
+        case .toTop:
+            newOrder.remove(at: currentIdx)
+            newOrder.insert(uid, at: 0)
         }
-        preferencesManager.moveOutputDevice(uid: uid, direction: direction)
+
+        preferencesManager.preferredOutputDeviceOrder = newOrder
         NotificationCenter.default.post(name: .preferredOutputDeviceChanged, object: uid)
     }
 
-    func useOutputDevice(at index: Int) {
-        let order = preferencesManager.preferredOutputDeviceOrder
-        guard index >= 0, index < order.count else { return }
-        let uid = order[index]
+    func useOutputDevice(at displayedIndex: Int) {
+        guard displayedIndex >= 0, displayedIndex < outputDevices.count else { return }
+        let uid = outputDevices[displayedIndex].id
 
         if let device = audioDeviceManager.device(forUID: uid) {
             audioDeviceManager.setDefaultOutputDevice(device)
@@ -471,7 +511,8 @@ final class PopoverViewModel: ObservableObject {
         }
 
         preferencesManager.preferredOutputDeviceUID = uid
-        if index > 0 {
+        let order = preferencesManager.preferredOutputDeviceOrder
+        if order.first != uid {
             preferencesManager.moveOutputDevice(uid: uid, direction: .toTop)
         }
         NotificationCenter.default.post(name: .preferredOutputDeviceChanged, object: uid)
@@ -556,10 +597,9 @@ final class PopoverViewModel: ObservableObject {
         customOutputVolumes = entries
     }
 
-    func removeOutputDevice(at index: Int) {
-        let order = preferencesManager.preferredOutputDeviceOrder
-        guard index >= 0, index < order.count else { return }
-        let uid = order[index]
+    func removeOutputDevice(at displayedIndex: Int) {
+        guard displayedIndex >= 0, displayedIndex < outputDevices.count else { return }
+        let uid = outputDevices[displayedIndex].id
         preferencesManager.removeOutputDeviceFromOrder(uid)
         if preferencesManager.preferredOutputDeviceUID == uid {
             preferencesManager.preferredOutputDeviceUID = nil
@@ -615,6 +655,12 @@ final class PopoverViewModel: ObservableObject {
     func setAutoResumeOnTopPriorityPick(_ enabled: Bool) {
         preferencesManager.autoResumeOnTopPriorityPick = enabled
         autoResumeOnTopPriorityPick = enabled
+    }
+
+    func setHideVirtualDevices(_ enabled: Bool) {
+        preferencesManager.hideVirtualDevices = enabled
+        hideVirtualDevices = enabled
+        refreshDeviceLists()
     }
 
     func setShowStats(_ enabled: Bool) {
