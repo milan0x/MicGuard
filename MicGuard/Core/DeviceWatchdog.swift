@@ -82,6 +82,12 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
     private let yieldWindow: TimeInterval = 10.0
     private let yieldMinSpread: TimeInterval = 1.0  // filters out Bluetooth flap storms
 
+    // Hijacks that fire within this window after a device-list change are OS-initiated
+    // routing (AirPods connecting, USB mic plugged in, etc.) — not user clicks. We still
+    // revert during the window; we just don't let them count toward the yield threshold.
+    private var lastDeviceListChangeAt: Date?
+    private let deviceListFluxWindow: TimeInterval = 5.0
+
     // MARK: - Direction hooks (set by subclasses)
 
     var deviceChangedPublisher: (() -> PassthroughSubject<AudioDevice?, Never>)!
@@ -131,6 +137,7 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
         isWatching = false
         isYielded = false
         recentHijackTimestamps.removeAll()
+        lastDeviceListChangeAt = nil
         cancellables.removeAll()
         debounceWorkItem?.cancel()
         debounceWorkItem = nil
@@ -204,6 +211,16 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
         guard autoYieldEnabled else { return false }
 
         let now = Date()
+
+        // Hijacks fired right after a device-list change are macOS re-routing
+        // (notably AirPods finishing HFP negotiation 2-5s after connect). Don't
+        // count those — they'd otherwise trip the 2-strikes rule on every connect.
+        if let fluxStart = lastDeviceListChangeAt,
+           now.timeIntervalSince(fluxStart) < deviceListFluxWindow {
+            MGLog.debug("[MicGuard.Watchdog] hijack inside device-list flux window — not counting toward yield")
+            return false
+        }
+
         recentHijackTimestamps.removeAll { now.timeIntervalSince($0) > yieldWindow }
 
         // Ignore events that fire too fast after the last one — that's Bluetooth, not a user.
@@ -227,6 +244,7 @@ class BaseDeviceWatchdog: DeviceWatchdogProtocol {
 
     func handleDeviceListChange() {
         MGLog.debug("[MicGuard.Watchdog] handleDeviceListChange isWatching=\(isWatching)")
+        lastDeviceListChangeAt = Date()
         guard isWatching, !isYielded else { return }
 
         if let bestDevice = selectBestDevice() {
