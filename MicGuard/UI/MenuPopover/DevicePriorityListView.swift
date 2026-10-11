@@ -107,7 +107,7 @@ private struct DeviceRow: View {
                     ZStack {
                         if entry.isActive {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.accentColor)
+                                .foregroundColor(.primary)
                         } else {
                             Image(systemName: "circle")
                                 .foregroundColor(.secondary.opacity(entry.isConnected ? 0.6 : 0.4))
@@ -122,7 +122,7 @@ private struct DeviceRow: View {
                         .frame(width: 22, alignment: .leading)
 
                     Text(entry.displayName)
-                        .font(.system(size: 12))
+                        .font(.system(size: 12, weight: entry.isActive ? .semibold : .regular))
                         .foregroundColor(rowColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -155,7 +155,7 @@ private struct DeviceRow: View {
 
             Button(action: onToggleExcluded) {
                 Image(systemName: entry.isExcluded ? "slash.circle.fill" : "slash.circle")
-                    .foregroundColor(entry.isExcluded ? .orange : .secondary.opacity(0.4))
+                    .foregroundColor(entry.isExcluded ? .secondary : .secondary.opacity(0.4))
             }
             .buttonStyle(.borderless)
             .help(excludeTooltip)
@@ -193,14 +193,14 @@ private struct DeviceRow: View {
     }
 
     private var rowColor: Color {
-        if entry.isActive { return .accentColor }
+        if entry.isActive { return .primary }
         if !entry.isConnected { return .secondary.opacity(0.55) }
         if entry.isExcluded { return .secondary }
         return .primary
     }
 
     private var rowBackground: Color {
-        if entry.isActive { return Color.accentColor.opacity(0.08) }
+        if entry.isActive { return Color.primary.opacity(0.05) }
         if isHovered { return Color.primary.opacity(0.06) }
         return .clear
     }
@@ -213,7 +213,7 @@ private struct UnsettableInfoIcon: View {
         Button(action: { isShowing.toggle() }) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 12))
-                .foregroundColor(.blue)
+                .foregroundColor(.secondary)
         }
         .buttonStyle(.plain)
         .help("macOS won't accept this as a default device. Click for details.")
@@ -221,7 +221,7 @@ private struct UnsettableInfoIcon: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.secondary)
                     Text("Can't be set as default")
                         .font(.system(size: 13, weight: .semibold))
                 }

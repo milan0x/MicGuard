@@ -101,14 +101,14 @@ private struct MasterToggleRow: View {
             HStack(spacing: 10) {
                 Image(systemName: viewModel.appPaused ? "mic.slash.fill" : "shield.fill")
                     .font(.system(size: 16))
-                    .foregroundColor(viewModel.appPaused ? .secondary : .green)
+                    .foregroundColor(viewModel.appPaused ? .secondary : .primary)
                     .frame(width: 20)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("MicGuard")
                         .font(.system(size: 14, weight: .semibold))
                     Text(viewModel.appPaused ? "Off — nothing is enforced" : "On — protecting your devices")
                         .font(.system(size: 11))
-                        .foregroundColor(viewModel.appPaused ? .orange : .secondary)
+                        .foregroundColor(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -187,7 +187,7 @@ private struct StatusSection: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: headerIcon)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.secondary)
                 Text(headerDeviceName)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
@@ -249,8 +249,7 @@ private struct StatusSection: View {
     }
 
     private var lockIconColor: Color {
-        if isLocked && isYielded { return .orange }
-        return isLocked ? .green : .secondary
+        isLocked && !isYielded ? .primary : .secondary
     }
 
     private var lockText: String {
@@ -312,7 +311,7 @@ struct FightOfferBanner: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.orange.opacity(0.1))
+                .fill(Color.primary.opacity(0.05))
         )
     }
 }
@@ -475,13 +474,13 @@ private struct VolumeStrategyRow: View {
                             .foregroundColor(.primary)
                         if let badge = badge {
                             Text(badge)
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(.accentColor)
-                                .padding(.horizontal, 5)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
                                 .background(
                                     RoundedRectangle(cornerRadius: 3)
-                                        .fill(Color.accentColor.opacity(0.15))
+                                        .fill(Color.secondary.opacity(0.12))
                                 )
                         }
                     }
@@ -495,7 +494,7 @@ private struct VolumeStrategyRow: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.clear)
+                    .fill(isSelected ? Color.primary.opacity(0.05) : Color.clear)
             )
             .contentShape(Rectangle())
         }
@@ -650,7 +649,7 @@ private struct CustomOutputVolumeRow: View {
                     HStack(spacing: 8) {
                         Image(systemName: "speaker.wave.2.fill")
                             .font(.system(size: 11))
-                            .foregroundColor(entry.isConnected ? .accentColor : .secondary.opacity(0.5))
+                            .foregroundColor(entry.isConnected ? .secondary : .secondary.opacity(0.5))
                             .frame(width: 16)
                         Text(entry.displayName)
                             .font(.system(size: 12))
