@@ -501,7 +501,7 @@
 				CODE_SIGN_ENTITLEMENTS = MicGuard/App/MicGuard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -514,7 +514,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LS_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.micguard.app;
 				PRODUCT_NAME = MicGuard;
 				SDKROOT = macosx;
@@ -528,7 +528,7 @@
 				CODE_SIGN_ENTITLEMENTS = MicGuard/App/MicGuard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -541,7 +541,7 @@
 					"@executable_path/../Frameworks",
 				);
 				LS_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.micguard.app;
 				PRODUCT_NAME = MicGuard;
 				SDKROOT = macosx;
