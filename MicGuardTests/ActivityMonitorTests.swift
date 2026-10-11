@@ -150,3 +150,60 @@ final class ActivityMonitorTests: XCTestCase {
         XCTAssertEqual(meetingEndedCount, 0, "Should not trigger meeting ended when not monitoring")
     }
 }
+
+// MARK: - Meeting-end semantics
+
+extension ActivityMonitorTests {
+
+    /// "Reset when mic stops" depends on onMeetingEnded firing when the device
+    /// stops RUNNING (an app released the mic) — not on volume-setting churn.
+    func testMeetingEndsWhenDeviceStopsRunning() {
+        let device = mockAudioManager.defaultInputDevice!
+        mockAudioManager.simulateVolumeChange(for: device, to: 0.75)
+
+        var started = 0
+        var ended = 0
+        activityMonitor.onMeetingStarted = { started += 1 }
+        activityMonitor.onMeetingEnded = { ended += 1 }
+
+        mockAudioManager.simulateDeviceRunning(device, isRunning: false)
+        activityMonitor.startMonitoring()   // initial poll: idle
+        XCTAssertEqual(started, 0)
+        XCTAssertEqual(ended, 0)
+
+        mockAudioManager.simulateDeviceRunning(device, isRunning: true)
+        activityMonitor.pollInputLevel()
+        XCTAssertEqual(started, 1, "App grabbed the mic — meeting started")
+        XCTAssertTrue(activityMonitor.isMicrophoneInUse)
+
+        activityMonitor.pollInputLevel()    // still running, volume untouched
+        XCTAssertEqual(ended, 0, "Steady volume while running must not end the meeting")
+
+        mockAudioManager.simulateDeviceRunning(device, isRunning: false)
+        activityMonitor.pollInputLevel()
+        XCTAssertEqual(ended, 1, "App released the mic — meeting ended")
+        XCTAssertFalse(activityMonitor.isMicrophoneInUse)
+    }
+
+    func testVolumeChangeAloneDoesNotStartOrEndMeeting() {
+        let device = mockAudioManager.defaultInputDevice!
+        mockAudioManager.simulateVolumeChange(for: device, to: 0.75)
+
+        var started = 0
+        var ended = 0
+        activityMonitor.onMeetingStarted = { started += 1 }
+        activityMonitor.onMeetingEnded = { ended += 1 }
+
+        mockAudioManager.simulateDeviceRunning(device, isRunning: false)
+        activityMonitor.startMonitoring()
+
+        // Something (user, auto-gain) moves the volume while nothing captures.
+        mockAudioManager.simulateVolumeChange(for: device, to: 0.3)
+        activityMonitor.pollInputLevel()
+        mockAudioManager.simulateVolumeChange(for: device, to: 0.5)
+        activityMonitor.pollInputLevel()
+
+        XCTAssertEqual(started, 0, "Volume churn is not a meeting")
+        XCTAssertEqual(ended, 0, "Volume settling is not a meeting end")
+    }
+}

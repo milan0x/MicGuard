@@ -41,6 +41,12 @@ class MockPreferencesForOnAir: PreferencesManaging {
     func cachedDeviceName(for uid: String) -> String? { nil }
     func replaceDeviceUID(oldUID: String, newUID: String) {}
     func replaceOutputDeviceUID(oldUID: String, newUID: String) {}
+    func isInputDeviceExcluded(_ uid: String) -> Bool { false }
+    func setInputDeviceExcluded(_ excluded: Bool, uid: String) {}
+    func isOutputDeviceExcluded(_ uid: String) -> Bool { false }
+    func setOutputDeviceExcluded(_ excluded: Bool, uid: String) {}
+    func isAutoExclusionEvaluated(_ uid: String) -> Bool { true }
+    func markAutoExclusionEvaluated(_ uid: String) {}
     func outputDeviceVolume(for uid: String) -> Float? { nil }
     func setOutputDeviceVolume(_ volume: Float?, for uid: String) {}
 }

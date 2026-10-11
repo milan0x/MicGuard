@@ -30,7 +30,7 @@ Or open the package in Xcode.
 
 ## What it does
 
-**Devices** — pin your input and output device, or let MicGuard pick the top connected device from a priority list. macOS won't be able to silently switch you away. When a higher-priority device plugs in, MicGuard can auto-switch to it (opt-in).
+**Devices** — pin your input and output device, or let MicGuard pick the top connected device from a priority list. macOS won't be able to silently switch you away. When a higher-priority device plugs in, MicGuard can auto-switch to it (opt-in). Devices you never want picked for you (the iPhone Continuity mic is excluded out of the box) stay in the list as *manual only* — toggle the ⃠ icon on a row. Closing a MacBook's lid skips the built-in mic, which the hardware mutes, and falls through to your next allowed device.
 
 **Volume** — three strategies for input volume:
 - *None* — don't manage

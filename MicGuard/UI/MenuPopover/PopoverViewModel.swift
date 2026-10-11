@@ -16,6 +16,8 @@ struct DeviceEntry: Identifiable, Equatable {
     let isActive: Bool
     let priority: Int     // 1-based
     let unsettable: Bool  // true if macOS rejected this device as default in this session
+    let isVirtual: Bool   // virtual / aggregate transport — what "Hide virtual devices" hides
+    let isExcluded: Bool  // user opted this device out of automatic selection
 }
 
 struct CustomOutputVolumeEntry: Identifiable, Equatable {
@@ -54,6 +56,7 @@ final class PopoverViewModel: ObservableObject {
     let audioDeviceManager: AudioDeviceManaging
     let preferencesManager: PreferencesManaging
     let statsManager: StatsManaging
+    let launchAtLoginProvider: LaunchAtLoginProviding
     weak var activityMonitor: ActivityMonitor?
 
 
@@ -77,6 +80,9 @@ final class PopoverViewModel: ObservableObject {
     @Published var customOutputVolumes: [CustomOutputVolumeEntry] = []
 
     @Published var launchAtLogin: Bool = false
+    /// Registered, but macOS is waiting for the user to approve it in
+    /// System Settings › General › Login Items.
+    @Published var launchAtLoginNeedsApproval: Bool = false
     @Published var micInUseIndicatorStyle: MicInUseIndicatorStyle = .orangePill
     @Published var autoResumeOnTopPriorityPick: Bool = false
     @Published var hideVirtualDevices: Bool = false
@@ -105,11 +111,13 @@ final class PopoverViewModel: ObservableObject {
     init(audioDeviceManager: AudioDeviceManaging,
          preferencesManager: PreferencesManaging,
          statsManager: StatsManaging,
-         activityMonitor: ActivityMonitor?) {
+         activityMonitor: ActivityMonitor?,
+         launchAtLoginProvider: LaunchAtLoginProviding = LaunchAtLoginManager.shared) {
         self.audioDeviceManager = audioDeviceManager
         self.preferencesManager = preferencesManager
         self.statsManager = statsManager
         self.activityMonitor = activityMonitor
+        self.launchAtLoginProvider = launchAtLoginProvider
 
         refreshAll()
         subscribe()
@@ -212,7 +220,7 @@ final class PopoverViewModel: ObservableObject {
         outputDeviceLockEnabled = preferencesManager.outputDeviceLockEnabled
         outputAutoSwitchEnabled = preferencesManager.outputAutoSwitchEnabled
         volumeStrategy = preferencesManager.volumeControlStrategy
-        launchAtLogin = preferencesManager.launchAtLogin
+        refreshLaunchAtLogin()
         micInUseIndicatorStyle = preferencesManager.micInUseIndicatorStyle
         autoResumeOnTopPriorityPick = preferencesManager.autoResumeOnTopPriorityPick
         hideVirtualDevices = preferencesManager.hideVirtualDevices
@@ -220,6 +228,9 @@ final class PopoverViewModel: ObservableObject {
 
         if !suppressVolumePublish {
             targetVolume = preferencesManager.targetVolume
+        }
+        if key == "ExcludedInputDeviceUIDs" || key == "ExcludedOutputDeviceUIDs" {
+            refreshDeviceLists()
         }
         refreshStatusLine()
     }
@@ -236,7 +247,7 @@ final class PopoverViewModel: ObservableObject {
         outputAutoSwitchEnabled = preferencesManager.outputAutoSwitchEnabled
         volumeStrategy = preferencesManager.volumeControlStrategy
         targetVolume = preferencesManager.targetVolume
-        launchAtLogin = preferencesManager.launchAtLogin
+        refreshLaunchAtLogin()
         micInUseIndicatorStyle = preferencesManager.micInUseIndicatorStyle
         autoResumeOnTopPriorityPick = preferencesManager.autoResumeOnTopPriorityPick
         hideVirtualDevices = preferencesManager.hideVirtualDevices
@@ -244,6 +255,13 @@ final class PopoverViewModel: ObservableObject {
         refreshDeviceLists()
         refreshStatusLine()
         refreshStats()
+    }
+
+    /// Toggle state comes from the system, never from the stored preference —
+    /// the preference is intent and has shown a phantom "on" before.
+    private func refreshLaunchAtLogin() {
+        launchAtLoginNeedsApproval = launchAtLoginProvider.requiresApproval
+        launchAtLogin = launchAtLoginProvider.isEnabled || launchAtLoginNeedsApproval
     }
 
     private func refreshStatusLine() {
@@ -264,6 +282,7 @@ final class PopoverViewModel: ObservableObject {
 
     private func computePreferredInputName() -> String? {
         for uid in preferencesManager.preferredInputDeviceOrder {
+            if preferencesManager.isInputDeviceExcluded(uid) { continue }
             if let device = audioDeviceManager.device(forUID: uid) {
                 return device.name
             }
@@ -276,6 +295,7 @@ final class PopoverViewModel: ObservableObject {
 
     private func computePreferredOutputName() -> String? {
         for uid in preferencesManager.preferredOutputDeviceOrder {
+            if preferencesManager.isOutputDeviceExcluded(uid) { continue }
             if let device = audioDeviceManager.device(forUID: uid) {
                 return device.name
             }
@@ -297,13 +317,15 @@ final class PopoverViewModel: ObservableObject {
     // MARK: - Device list resolution
 
     private func refreshDeviceLists() {
+        applyDefaultExclusions()
         inputDevices = resolveDeviceList(
             priorityOrder: preferencesManager.preferredInputDeviceOrder,
             allDevices: audioDeviceManager.inputDevices,
             activeUID: audioDeviceManager.defaultInputDevice?.uid,
             addToOrder: { [weak self] uid in self?.preferencesManager.addDeviceToOrder(uid) },
             replaceUID: { [weak self] old, new in self?.preferencesManager.replaceDeviceUID(oldUID: old, newUID: new) },
-            currentOrder: { [weak self] in self?.preferencesManager.preferredInputDeviceOrder ?? [] }
+            currentOrder: { [weak self] in self?.preferencesManager.preferredInputDeviceOrder ?? [] },
+            isExcluded: { [weak self] uid in self?.preferencesManager.isInputDeviceExcluded(uid) ?? false }
         )
 
         outputDevices = resolveDeviceList(
@@ -312,10 +334,41 @@ final class PopoverViewModel: ObservableObject {
             activeUID: audioDeviceManager.defaultOutputDevice?.uid,
             addToOrder: { [weak self] uid in self?.preferencesManager.addOutputDeviceToOrder(uid) },
             replaceUID: { [weak self] old, new in self?.preferencesManager.replaceOutputDeviceUID(oldUID: old, newUID: new) },
-            currentOrder: { [weak self] in self?.preferencesManager.preferredOutputDeviceOrder ?? [] }
+            currentOrder: { [weak self] in self?.preferencesManager.preferredOutputDeviceOrder ?? [] },
+            isExcluded: { [weak self] uid in self?.preferencesManager.isOutputDeviceExcluded(uid) ?? false }
         )
 
         refreshCustomOutputVolumes()
+    }
+
+    /// Default-exclusion rule, applied once per device UID the first time it is
+    /// seen connected: an iPhone/iPad Continuity mic starts excluded from
+    /// auto-selection. It shows up whenever the phone is nearby and would
+    /// otherwise be the clamshell fallthrough target uninvited. Per-UID (not a
+    /// one-shot flag) so an install upgraded while the phone was away still
+    /// gets the rule the first time the phone appears — and so a user who later
+    /// allows the device is never overruled.
+    private func applyDefaultExclusions() {
+        for device in audioDeviceManager.inputDevices
+        where !preferencesManager.isAutoExclusionEvaluated(device.uid) {
+            preferencesManager.markAutoExclusionEvaluated(device.uid)
+            if device.isContinuityCapture {
+                MGLog.debug("[MicGuard.PopoverVM] Continuity mic \(device.name) seen for the first time — excluded from auto-selection by default")
+                preferencesManager.setInputDeviceExcluded(true, uid: device.uid)
+            }
+        }
+        // Disconnected entries carry no transport type; the cached name is the
+        // only signal. Catches an iPhone appended by an older version while the
+        // phone is out of range.
+        for uid in preferencesManager.preferredInputDeviceOrder
+        where !preferencesManager.isAutoExclusionEvaluated(uid) {
+            guard let name = preferencesManager.cachedDeviceName(for: uid) else { continue }
+            preferencesManager.markAutoExclusionEvaluated(uid)
+            if AudioDevice.isContinuityName(name) {
+                MGLog.debug("[MicGuard.PopoverVM] listed Continuity mic \(name) (by name) — excluded from auto-selection by default")
+                preferencesManager.setInputDeviceExcluded(true, uid: uid)
+            }
+        }
     }
 
     private func resolveDeviceList(
@@ -324,7 +377,8 @@ final class PopoverViewModel: ObservableObject {
         activeUID: String?,
         addToOrder: (String) -> Void,
         replaceUID: (String, String) -> Void,
-        currentOrder: () -> [String]
+        currentOrder: () -> [String],
+        isExcluded: (String) -> Bool
     ) -> [DeviceEntry] {
 
         struct Resolved {
@@ -410,7 +464,9 @@ final class PopoverViewModel: ObservableObject {
                 isConnected: isConnected,
                 isActive: entry.uid == activeUID,
                 priority: index + 1,
-                unsettable: unsettableUIDs.contains(entry.uid) || likelyUnsettable
+                unsettable: unsettableUIDs.contains(entry.uid) || likelyUnsettable,
+                isVirtual: likelyUnsettable,
+                isExcluded: isExcluded(entry.uid)
             )
         }
 
@@ -418,8 +474,10 @@ final class PopoverViewModel: ObservableObject {
         // entries from the display. The stored priority order is untouched —
         // priority numbers remain the stored positions (so "#3" still means
         // 3rd in the actual order even if a virtual #2 is hidden between).
+        // Only transport-classified virtual devices hide: a real mic that macOS
+        // refused once this session must stay visible.
         if hideVirtualDevices {
-            return allEntries.filter { !$0.unsettable }
+            return allEntries.filter { !$0.isVirtual }
         }
         return allEntries
     }
@@ -529,6 +587,9 @@ final class PopoverViewModel: ObservableObject {
             unsettableUIDs.remove(uid)
         }
 
+        // A deliberate pick overrides "never auto-select" — otherwise the watchdog
+        // would skip the user's new #1 and bounce straight off it.
+        preferencesManager.setInputDeviceExcluded(false, uid: uid)
         preferencesManager.preferredInputDeviceUID = uid
         // Promote to top of stored order if not already #1 there.
         let order = preferencesManager.preferredInputDeviceOrder
@@ -544,33 +605,20 @@ final class PopoverViewModel: ObservableObject {
         NotificationCenter.default.post(name: .userRequestedResumeInputProtection, object: nil)
     }
 
-    /// Snap the system default input to the top connected device in priority order.
-    /// Does not reorder the priority list — honors what's already there. Safe to call
-    /// regardless of which protection toggles are on; it's a one-shot manual command.
-    /// Also clears any yielded-protection state so the lock resumes after the user
-    /// previously fought it off via repeated manual overrides.
+    /// Snap the system default input to the top usable device in priority order.
+    /// Does not reorder the priority list. Handled by AppDelegate, which knows
+    /// about lid state and exclusions; it also clears any yielded lock state.
     func reapplyInputPriority() {
-        NotificationCenter.default.post(name: .userRequestedResumeInputProtection, object: nil)
-        guard let target = bestConnectedInput() else { return }
-        guard audioDeviceManager.defaultInputDevice?.uid != target.uid else { return }
-        audioDeviceManager.setDefaultInputDevice(target)
-        NotificationCenter.default.post(name: .preferredInputDeviceChanged, object: target.uid)
+        NotificationCenter.default.post(name: .userRequestedReapplyInputPriority, object: nil)
     }
 
-    private func bestConnectedInput() -> AudioDevice? {
-        for uid in preferencesManager.preferredInputDeviceOrder {
-            if let device = audioDeviceManager.device(forUID: uid), device.isInput {
-                return device
-            }
-            if let name = preferencesManager.cachedDeviceName(for: uid) {
-                let matches = audioDeviceManager.inputDevices(withName: name)
-                if matches.count == 1 {
-                    preferencesManager.replaceDeviceUID(oldUID: uid, newUID: matches[0].uid)
-                    return matches[0]
-                }
-            }
-        }
-        return nil
+    /// Toggle "never auto-select" for the row at `displayedIndex`.
+    func setInputDeviceExcluded(at displayedIndex: Int, excluded: Bool) {
+        guard displayedIndex >= 0, displayedIndex < inputDevices.count else { return }
+        preferencesManager.setInputDeviceExcluded(excluded, uid: inputDevices[displayedIndex].id)
+        // Reflect immediately — the preference echo arrives a run-loop hop later.
+        refreshDeviceLists()
+        refreshStatusLine()
     }
 
     func removeInputDevice(at displayedIndex: Int) {
@@ -641,6 +689,7 @@ final class PopoverViewModel: ObservableObject {
             unsettableUIDs.remove(uid)
         }
 
+        preferencesManager.setOutputDeviceExcluded(false, uid: uid)
         preferencesManager.preferredOutputDeviceUID = uid
         let order = preferencesManager.preferredOutputDeviceOrder
         if order.first != uid {
@@ -652,31 +701,16 @@ final class PopoverViewModel: ObservableObject {
         NotificationCenter.default.post(name: .userRequestedResumeOutputProtection, object: nil)
     }
 
-    /// Snap the system default output to the top connected device in priority order.
     /// Same semantics as reapplyInputPriority — does not reorder the list.
-    /// Also clears any yielded-protection state.
     func reapplyOutputPriority() {
-        NotificationCenter.default.post(name: .userRequestedResumeOutputProtection, object: nil)
-        guard let target = bestConnectedOutput() else { return }
-        guard audioDeviceManager.defaultOutputDevice?.uid != target.uid else { return }
-        audioDeviceManager.setDefaultOutputDevice(target)
-        NotificationCenter.default.post(name: .preferredOutputDeviceChanged, object: target.uid)
+        NotificationCenter.default.post(name: .userRequestedReapplyOutputPriority, object: nil)
     }
 
-    private func bestConnectedOutput() -> AudioDevice? {
-        for uid in preferencesManager.preferredOutputDeviceOrder {
-            if let device = audioDeviceManager.device(forUID: uid), device.isOutput {
-                return device
-            }
-            if let name = preferencesManager.cachedDeviceName(for: uid) {
-                let matches = audioDeviceManager.outputDevices(withName: name)
-                if matches.count == 1 {
-                    preferencesManager.replaceOutputDeviceUID(oldUID: uid, newUID: matches[0].uid)
-                    return matches[0]
-                }
-            }
-        }
-        return nil
+    func setOutputDeviceExcluded(at displayedIndex: Int, excluded: Bool) {
+        guard displayedIndex >= 0, displayedIndex < outputDevices.count else { return }
+        preferencesManager.setOutputDeviceExcluded(excluded, uid: outputDevices[displayedIndex].id)
+        refreshDeviceLists()
+        refreshStatusLine()
     }
 
     /// Persist a per-device output volume default. If the device is currently the
@@ -765,8 +799,16 @@ final class PopoverViewModel: ObservableObject {
     // MARK: - Actions: Settings
 
     func setLaunchAtLogin(_ enabled: Bool) {
-        preferencesManager.launchAtLogin = enabled
-        launchAtLogin = enabled
+        let ok = launchAtLoginProvider.setLaunchAtLogin(enabled: enabled)
+        MGLog.debug("[MicGuard.PopoverVM] launch at login → \(enabled) ok=\(ok)")
+        // Re-read the system either way: on failure the toggle snaps back to
+        // what is actually registered instead of lying.
+        refreshLaunchAtLogin()
+        preferencesManager.launchAtLogin = launchAtLogin
+    }
+
+    func openLoginItemsSettings() {
+        launchAtLoginProvider.openSystemSettings()
     }
 
     /// Master kill switch. Pausing clears yield mirrors and pending fight offers —
@@ -807,8 +849,9 @@ final class PopoverViewModel: ObservableObject {
     func showAbout() {
         let alert = NSAlert()
         alert.messageText = "MicGuard"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
         alert.informativeText = """
-        Version 1.0
+        Version \(version)
 
         Your Mic, Your Rules.
 

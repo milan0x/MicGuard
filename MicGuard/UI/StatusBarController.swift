@@ -231,6 +231,8 @@ extension Notification.Name {
     static let preferredOutputDeviceChanged = Notification.Name("preferredOutputDeviceChanged")
     static let userRequestedResumeInputProtection = Notification.Name("userRequestedResumeInputProtection")
     static let userRequestedResumeOutputProtection = Notification.Name("userRequestedResumeOutputProtection")
+    static let userRequestedReapplyInputPriority = Notification.Name("userRequestedReapplyInputPriority")
+    static let userRequestedReapplyOutputPriority = Notification.Name("userRequestedReapplyOutputPriority")
     static let userRequestedYieldInputProtection = Notification.Name("userRequestedYieldInputProtection")
     static let userRequestedYieldOutputProtection = Notification.Name("userRequestedYieldOutputProtection")
     /// userInfo: ["direction": "input"|"output", "yielded": Bool]

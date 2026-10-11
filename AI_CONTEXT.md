@@ -6,7 +6,7 @@ This file provides context for AI assistants working on this codebase. If you're
 
 Native macOS menu bar app (Swift, AppKit shell + SwiftUI popover, CoreAudio). Prevents OS and apps from hijacking audio device selection or volume levels. Zero external dependencies.
 
-**Build:** `swift build` | **Test:** `swift test` | **Run:** Xcode Cmd+R
+**Build:** `swift build` | **Test:** `swift test` | **Run:** Xcode Cmd+R (or `.build/debug/MicGuard` — unbundled: no bundle id, no `LSUIElement`, launch-at-login unavailable)
 
 ## Architecture
 
@@ -14,14 +14,15 @@ Layered components with dependency injection and Combine-based reactive communic
 
 **Initialization order** (`AppDelegate.applicationDidFinishLaunching`):
 1. `AudioDeviceManager` — CoreAudio wrapper (device enumeration, volume control, listener registration, publishes `devicesChangedPublisher` / `defaultInputChangedPublisher` / `defaultOutputChangedPublisher`)
+1a. `ClamshellMonitor` — IOKit lid-state tracker; feeds the input watchdog's `isDeviceUsable` hook so a closed lid skips the (hardware-muted) built-in mic
 2. `DeviceWatchdog` and `OutputDeviceWatchdog` — both subclass `BaseDeviceWatchdog`; enforce preferred device via priority-ordered list, with optional auto-yield on repeated override and auto-resume on top-priority pick
 3. `VolumeGuard` — enforces target input volume using CoreAudio property listeners
 4. `ActivityMonitor` — detects mic-in-use state via CoreAudio running state + polling fallback; supports `overrideMonitoredDevice` so the On Air indicator stays correct when the locked device differs from the system default
 5. `StatusBarController` — owns the `NSStatusItem`, `NSPopover`, `OnAirIndicator`, and constructs `PopoverViewModel` for the SwiftUI UI
 
 **Source layout:**
-- `MicGuard/App/` — Entry point and lifecycle (`AppDelegate` coordinates everything)
-- `MicGuard/Core/` — `AudioDeviceManager`, `DeviceWatchdog` (file contains `BaseDeviceWatchdog`, `DeviceWatchdog`, `OutputDeviceWatchdog`), `VolumeGuard`, `ActivityMonitor`, `ProcessMonitor`
+- `MicGuard/App/` — `main.swift` (plain AppKit entry: `NSApplication` + `AppDelegate`; no SwiftUI `App`, because a SwiftUI app needs at least one scene and the placeholder `Settings` scene showed up as an empty window on ⌘,) and `AppDelegate` (coordinates everything)
+- `MicGuard/Core/` — `AudioDeviceManager`, `ClamshellMonitor`, `DeviceWatchdog` (file contains `BaseDeviceWatchdog`, `DeviceWatchdog`, `OutputDeviceWatchdog`), `VolumeGuard`, `ActivityMonitor`, `ProcessMonitor`
 - `MicGuard/UI/` — `StatusBarController` (thin shell, ~220 lines), `OnAirIndicator` (menu-bar icon states, flash labels, pulse)
 - `MicGuard/UI/MenuPopover/` — `PopoverViewModel` (`@MainActor ObservableObject` bridging managers to SwiftUI), `PopoverContentView` (tabbed root view: Input / Output / Settings), `DevicePriorityListView` (drag-reorderable device list)
 - `MicGuard/Utilities/` — `PreferencesManager`, `StatsManager`, `NotificationManager` (dormant), `MGLog` (debug-only logger, compiled out in Release)
@@ -39,11 +40,17 @@ Layered components with dependency injection and Combine-based reactive communic
 - *Auto-resume* (`autoResumeOnTopPriorityPick`, default off): resumes only when the new default is strictly priority #1 (resolved through name matching), never on the best-available or fallback device, and never inside the device-list flux window.
 - *Unsettable fallthrough*: when `setDefaultDevice` reports success but the default doesn't move (macOS silently refuses Teams Audio / BlackHole / aggregates), the watchdog counts the failure and after 2 skips that device for the session, falling through to the next priority entry instead of retrying forever. Counts reset on device-list changes.
 
+**Device usability (what enforcement may route to):** every automatic route — watchdog fallthrough, auto-switch, the grab-correction path, the ActivityMonitor override and the popover's Re-apply — goes through `AppDelegate.isUsableInput` / `isUsableOutput`. A device is unusable when (a) the user excluded it from auto-selection (`PreferencesManager.isInputDeviceExcluded`, persisted `ExcludedInputDeviceUIDs` / `ExcludedOutputDeviceUIDs`), or (b) for inputs, the lid is closed and the transport is built-in (`ClamshellMonitor`). Excluded devices stay in the priority list for manual use (row shows a "manual only" tag and a ⃠ toggle); clicking a row to use it clears the exclusion, since the lock would otherwise bounce off the new #1. `PopoverViewModel.applyDefaultExclusions` runs a once-per-UID rule the first time a device is seen connected: iPhone/iPad Continuity mics (`AudioDevice.isContinuityCapture`: transports `ccwd`/`ccwl`, or an "iPhone Microphone" / "iPad Microphone" name) start excluded, because they appear whenever the phone is nearby and would otherwise be the clamshell fallthrough target. The per-UID marker (`AutoExclusionEvaluatedUIDs`) means the rule also catches entries auto-appended before exclusions existed, and never overrules a user who later allows the device. Exclusion edits publish their key; `AppDelegate.handlePreferenceChange` re-evaluates routing (switch away from a newly excluded default, or to a newly allowed higher priority). Re-apply is a notification (`userRequestedReapplyInputPriority`) handled in `AppDelegate`, not the view model, so it sees lid state and exclusions.
+
+**Priority-order sync:** the watchdogs keep a private copy of the order. Manual edits reach them via the `preferredInputDeviceChanged` / `preferredOutputDeviceChanged` notifications; writes that bypass those (the popover auto-appending a newly seen device, UID rescues) reach them through `AppDelegate.handlePreferenceChange` on the `PreferredInputDeviceOrder` / `PreferredOutputDeviceOrder` keys, which updates a running watchdog in place (yield state survives).
+
 **Volume lock:** `VolumeGuard` attaches a CoreAudio listener to the device volume property → detects drift beyond tolerance (`0.01`) → debounces (default 2.5s, with a hard deadline: continuous churn such as conferencing auto-gain cannot postpone the correction past first-drift + interval) → corrects volume → anti-fight throttle (max 10 corrections per 5s window). On a default-device switch it re-applies the target after a 0.5s settle, so a device left at the wrong gain doesn't sit there until something else trips the listener.
 
-**Smart reset:** `ActivityMonitor` checks `isDeviceRunning` (device-level, not per-app) → when mic stops → `onMeetingEnded` fires → if strategy is `resetWhenMicStops` and current volume < target → resets volume.
+**Smart reset:** `ActivityMonitor.pollInputLevel` (CoreAudio running-state listener + 2s polling fallback) computes "any real input device is running somewhere" (`checkAnyMicInUse`, device-level, virtual/aggregate transports skipped). `isMicrophoneInUse` is the single source of truth: `onMeetingStarted` / `onMeetingEnded` fire on its rising / falling edge and `micInUsePublisher` drives the On Air indicator. If the strategy is `resetWhenMicStops` and current volume < target when the mic is released → resets volume. (Earlier versions keyed the meeting end on the input *volume setting* going quiet for 2s, which reset mid-call whenever a conferencing app's auto-gain settled — see `ActivityMonitorTests.testMeetingEndsWhenDeviceStopsRunning`.)
 
 **Per-device output volume:** When `defaultOutputChangedPublisher` fires, `AppDelegate` looks up a per-UID target via `preferencesManager.outputDeviceVolume(for:)` and sets the device volume **once** (set-on-activation; no continuous enforcement). Lets users keep wildly different levels for headphones vs. speakers without rebalancing every switch.
+
+**Launch at login:** `SMAppService.mainApp` is the source of truth; `PreferencesManager.launchAtLogin` is only the user's intent. The popover toggle mirrors `LaunchAtLoginManager.isEnabled || requiresApproval` (never the preference), a failed register/unregister snaps the toggle back, and `.requiresApproval` shows a hint with a button to System Settings › Login Items. At launch `AppDelegate` calls `LaunchAtLoginManager.reconcile(intent:)`: if intent is on but the system has no registration (`.notRegistered` / `.notFound`) it registers, then rewrites the intent to match reality. It never unregisters on its own. Registration is impossible from an unbundled `swift build` binary (`isBundled` false) — it registers whatever bundle path is running, so only test it from a real `.app` and unregister afterwards (`osascript -e 'tell application "System Events" to delete login item "MicGuard"'`, verify with `sfltool dumpbtm | grep micguard`).
 
 **Preference propagation:** UI change → `PreferencesManager` writes UserDefaults + publishes key via `preferencesChangedPublisher` → `AppDelegate.handlePreferenceChange(key:)` dispatches to the right guard component. A few legacy `NotificationCenter` names (`preferredInputDeviceChanged`, `preferredOutputDeviceChanged`) are still used for device-order updates.
 
@@ -55,23 +62,25 @@ Layered components with dependency injection and Combine-based reactive communic
 
 **New preference:** Add key + getter/setter to `PreferencesManager`, expose on the `PreferencesManaging` protocol, publish the key via `preferencesChangedPublisher`, and handle it in `AppDelegate.handlePreferenceChange(key:)`.
 
-**New test:** Add `{Component}Tests.swift` in `MicGuardTests`. Use `MockAudioDeviceManager` for deterministic testing.
+**New test:** Add `{Component}Tests.swift` in `MicGuardTests` and list it in `Package.swift`'s test target (then `xcodegen generate` to refresh the Xcode project). Use `MockAudioDeviceManager` for deterministic testing; `PopoverViewModelTests` shows how to drive the view model with a real `PreferencesManager` on a throwaway `UserDefaults` suite. `ActivityMonitor.pollInputLevel` and `VolumeGuard.handleVolumeChange` are internal (not private) so tests can fire the paths that CoreAudio listeners normally trigger.
 
 ## Known Limitations
 
-**"Reset When Mic Not In Use" misses overlapping app usage:** `isDeviceRunning` is device-level — if Discord holds the mic while you leave a Zoom call, the device stays "running" and the reset never triggers. Users in persistent voice calls should use "Lock Input Volume" instead.
+**"Reset When Mic Not In Use" is device-level, not per-app:** the meeting-end edge is "no real input device is running anywhere". If Discord holds the mic while you leave a Zoom call, nothing is released and the reset waits until the last app lets go. Users in persistent voice calls should use "Lock Input Volume" instead.
 
 **Notifications disabled:** `NotificationManager` exists but is not wired up in `AppDelegate` (commented out due to a bundle-identifier crash when running outside Xcode).
 
-**CoreAudio listener lifecycle is fragile:** Listeners registered per-device can fail silently if a device ID becomes invalid between registration and removal. Always check removal status.
-
 **ProcessMonitor uses hardcoded bundle IDs:** New audio apps won't be detected until bundle IDs are added. Falls back to `.nonRTC` for unknown apps.
+
+**Default exclusions use transport type plus a name guard:** the "Continuity mics start excluded" rule reads the transport when the device is enumerated, and falls back to the cached name ("iPhone Microphone" / "iPad Microphone", `AudioDevice.isContinuityName`) for disconnected entries so an upgraded install is covered even while the phone is away. Per-UID marker either way; a renamed phone with an exotic name is only caught once connected.
 
 **Name-based device matching is ambiguous:** When a device reconnects with a new UID, matching falls back to its display name. With two devices sharing a name, the watchdog refuses to guess (`onDeviceMatchAmbiguous` fires but isn't surfaced in the UI) and that priority entry stays unresolved. The popover list still shows connected devices in this case (they're appended as new entries), but the stale entry remains a ghost until the user re-picks the device.
 
 **Unsettable-device tracking is per-session only:** Devices macOS silently refuses to set as default (BlackHole, Teams Audio, aggregates) are tracked in two session-scoped sets — `PopoverViewModel.unsettableUIDs` (dims them in the UI) and the watchdogs' stick-failure counts (skips them during enforcement). Neither persists across launches.
 
-**No anti-fight throttle test coverage:** `VolumeGuard`'s 10-corrections-per-5s throttle works but has no unit tests (debounce deadline and device-switch enforcement are covered).
+**Volume lock pauses under a sustained fight:** `VolumeGuard` allows 10 corrections per 5s; past that it deliberately stops correcting until the window resets, so an app rewriting gain continuously can win for up to 5s at a time. (The debounce is deadline-capped, so churn cannot starve corrections entirely.)
+
+**No anti-fight throttle test coverage:** `VolumeGuard`'s 10-corrections-per-5s throttle works but has no unit tests (debounce deadline and device-switch enforcement are covered). `AppDelegate` routing (lid + exclusion + auto-switch composition) is not unit-tested either — it is exercised by launching the app.
 
 ## Conventions
 

@@ -263,6 +263,15 @@ private struct StatusSection: View {
                 : (viewModel.preferredInputDisplayName ?? "preferred device")
             return "Enforcing priority · \(name)"
         }
+        // Auto-switch alone still snaps a system grab back to the top device once
+        // (a repeated human pick is respected) — say so instead of "no lock".
+        let autoSwitch = showsOutput ? viewModel.outputAutoSwitchEnabled : viewModel.inputAutoSwitchEnabled
+        if autoSwitch {
+            let name = showsOutput
+                ? (viewModel.preferredOutputDisplayName ?? "top device")
+                : (viewModel.preferredInputDisplayName ?? "top device")
+            return "Auto-switch · prefers \(name)"
+        }
         return "No lock — devices may auto-switch"
     }
 }
@@ -360,6 +369,7 @@ private struct InputSection: View {
                 onMoveUp: { viewModel.moveInputDevice(at: $0, direction: .up) },
                 onMoveDown: { viewModel.moveInputDevice(at: $0, direction: .down) },
                 onRemove: { viewModel.removeInputDevice(at: $0) },
+                onToggleExcluded: { index, excluded in viewModel.setInputDeviceExcluded(at: index, excluded: excluded) },
                 onReapply: { viewModel.reapplyInputPriority() }
             )
 
@@ -545,6 +555,7 @@ private struct OutputSection: View {
                 onMoveUp: { viewModel.moveOutputDevice(at: $0, direction: .up) },
                 onMoveDown: { viewModel.moveOutputDevice(at: $0, direction: .down) },
                 onRemove: { viewModel.removeOutputDevice(at: $0) },
+                onToggleExcluded: { index, excluded in viewModel.setOutputDeviceExcluded(at: index, excluded: excluded) },
                 onReapply: { viewModel.reapplyOutputPriority() }
             )
 
@@ -808,6 +819,21 @@ private struct SettingsSection: View {
             }
             .toggleStyle(.switch)
             .controlSize(.small)
+
+            if viewModel.launchAtLoginNeedsApproval {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                        .font(.system(size: 11))
+                    Text("Waiting for approval in System Settings › Login Items")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("Open") { viewModel.openLoginItemsSettings() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+            }
 
             Toggle(isOn: Binding(
                 get: { viewModel.autoResumeOnTopPriorityPick },

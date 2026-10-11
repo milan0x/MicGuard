@@ -16,9 +16,9 @@
 		2D0C28F08E4E2189671AF32A /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026BA6A21433C1568EAAE69D /* StatusBarController.swift */; };
 		2E0D94445F000B1BAEA7AEFE /* ClamshellMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA5DE403CE3D4262B9F9A2E /* ClamshellMonitor.swift */; };
 		377FBE04435A4F710B7C8664 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF58486181BD7EAC6339A19D /* AppDelegate.swift */; };
+		3BEFDC72A3F79140F01E221B /* PopoverViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BAB3DAF169F0A0BAA02CC4 /* PopoverViewModelTests.swift */; };
 		3F37E64541024A1935A4EE79 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E6D040238D0366F8D854022 /* ServiceManagement.framework */; };
 		4A788FB92EC420295BCD1913 /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A53A63F92F43E8D9A9A49D /* PopoverContentView.swift */; };
-		4AA2A2771ED2D157DF8A307F /* MicGuardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */; };
 		4C02C22C3D4E5D9923610D35 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D14FDE4A4BAB4EA87A74DAF5 /* AppKit.framework */; };
 		5F60D898A14EC0DF001E973C /* DeviceWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5402F144B596FE9D04B12231 /* DeviceWatchdog.swift */; };
 		60BB5B71AE333E741C4B7E63 /* PopoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5E834163AD279EB488F764 /* PopoverViewModel.swift */; };
@@ -31,6 +31,7 @@
 		817165F01181142654788D33 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B7A3A1BF72AF0757AFF199D /* CoreAudio.framework */; };
 		82254C399AFF14A7FB1CE54E /* VolumeGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9EF3670D38515CF80725F1 /* VolumeGuard.swift */; };
 		82C66B9309DF87F1F906B6EE /* ProcessMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6609B20D47378A5C9AB137 /* ProcessMonitorTests.swift */; };
+		8C02E5290809BC8CC0904634 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60D75ACD176843B103926764 /* main.swift */; };
 		9474CDD3F6E89ECC9B65952B /* StatsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F63A1260DED312BCCD8C589 /* StatsManager.swift */; };
 		9F6741B73A45F8B78A24F4DA /* MockAudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E55EE43EBEC5B1089E6F35 /* MockAudioDeviceManager.swift */; };
 		B0DDF29FF18699A8A714BAFB /* AudioDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65D046220518AE607C60266E /* AudioDeviceTests.swift */; };
@@ -62,10 +63,10 @@
 		48A2E83C7C0A1552B059E390 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
 		4AA5DE403CE3D4262B9F9A2E /* ClamshellMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClamshellMonitor.swift; sourceTree = "<group>"; };
 		4D855FFC6A0E3F07DF4B3338 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
-		50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicGuardApp.swift; sourceTree = "<group>"; };
 		5402F144B596FE9D04B12231 /* DeviceWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWatchdog.swift; sourceTree = "<group>"; };
 		58A53A63F92F43E8D9A9A49D /* PopoverContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverContentView.swift; sourceTree = "<group>"; };
 		5F9EF3670D38515CF80725F1 /* VolumeGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeGuard.swift; sourceTree = "<group>"; };
+		60D75ACD176843B103926764 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		63A19C59F076E4C11C60C953 /* WatchdogYieldTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchdogYieldTests.swift; sourceTree = "<group>"; };
 		65D046220518AE607C60266E /* AudioDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceTests.swift; sourceTree = "<group>"; };
 		6A5E834163AD279EB488F764 /* PopoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverViewModel.swift; sourceTree = "<group>"; };
@@ -85,6 +86,7 @@
 		C83F9EC758C38AC76CB1C831 /* MicGuard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MicGuard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C84A882C8366DD60D8C247ED /* StatsManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsManagerTests.swift; sourceTree = "<group>"; };
 		D14FDE4A4BAB4EA87A74DAF5 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = AppKit.framework; sourceTree = "<group>"; };
+		D3BAB3DAF169F0A0BAA02CC4 /* PopoverViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverViewModelTests.swift; sourceTree = "<group>"; };
 		DB6609B20D47378A5C9AB137 /* ProcessMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitorTests.swift; sourceTree = "<group>"; };
 		DF58486181BD7EAC6339A19D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		ECB2729A791348CF3CD2A9F0 /* ActivityMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitorTests.swift; sourceTree = "<group>"; };
@@ -171,8 +173,8 @@
 			children = (
 				DF58486181BD7EAC6339A19D /* AppDelegate.swift */,
 				C09AF8FC8B60E166A64F34C5 /* Info.plist */,
+				60D75ACD176843B103926764 /* main.swift */,
 				B2BC6EAF3148A8BF4BC51F46 /* MicGuard.entitlements */,
-				50DAFF48FD3D51FF1E0BB7C6 /* MicGuardApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -196,6 +198,7 @@
 				8A04B3A00C4251AC5E78BEF5 /* Mocks */,
 				951A3423131A20D2D7086FA6 /* OnAirIndicatorTests.swift */,
 				C2A0A7A0D04087851FF0A344 /* OutputDeviceWatchdogTests.swift */,
+				D3BAB3DAF169F0A0BAA02CC4 /* PopoverViewModelTests.swift */,
 				9090B7CE10EEA47ADDC7F868 /* PreferencesManagerTests.swift */,
 				DB6609B20D47378A5C9AB137 /* ProcessMonitorTests.swift */,
 				C84A882C8366DD60D8C247ED /* StatsManagerTests.swift */,
@@ -312,7 +315,6 @@
 				7DD1F836F15E4352B2D50596 /* DevicePriorityListView.swift in Sources */,
 				5F60D898A14EC0DF001E973C /* DeviceWatchdog.swift in Sources */,
 				2021B0AF5767E6BF4E625390 /* MGLog.swift in Sources */,
-				4AA2A2771ED2D157DF8A307F /* MicGuardApp.swift in Sources */,
 				EEDA6E1DD2C97227F4AA7CAE /* NotificationManager.swift in Sources */,
 				61EF87980C7292C453E3A064 /* OnAirIndicator.swift in Sources */,
 				4A788FB92EC420295BCD1913 /* PopoverContentView.swift in Sources */,
@@ -322,6 +324,7 @@
 				9474CDD3F6E89ECC9B65952B /* StatsManager.swift in Sources */,
 				2D0C28F08E4E2189671AF32A /* StatusBarController.swift in Sources */,
 				82254C399AFF14A7FB1CE54E /* VolumeGuard.swift in Sources */,
+				8C02E5290809BC8CC0904634 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -335,6 +338,7 @@
 				9F6741B73A45F8B78A24F4DA /* MockAudioDeviceManager.swift in Sources */,
 				D20E393BF9E5E9BA03FF7B5B /* OnAirIndicatorTests.swift in Sources */,
 				252B26D576F0AF1359C11D97 /* OutputDeviceWatchdogTests.swift in Sources */,
+				3BEFDC72A3F79140F01E221B /* PopoverViewModelTests.swift in Sources */,
 				07F9667ACC9964EC414E201B /* PreferencesManagerTests.swift in Sources */,
 				82C66B9309DF87F1F906B6EE /* ProcessMonitorTests.swift in Sources */,
 				7C7AA92E2629894DE14D2784 /* StatsManagerTests.swift in Sources */,

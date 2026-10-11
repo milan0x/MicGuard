@@ -15,6 +15,7 @@ struct DevicePriorityListView: View {
     let onMoveUp: (Int) -> Void
     let onMoveDown: (Int) -> Void
     let onRemove: (Int) -> Void
+    let onToggleExcluded: (Int, Bool) -> Void
     let onReapply: () -> Void
 
     var body: some View {
@@ -52,7 +53,8 @@ struct DevicePriorityListView: View {
                                 onUse: { onUse(index) },
                                 onMoveUp: { onMoveUp(index) },
                                 onMoveDown: { onMoveDown(index) },
-                                onRemove: { onRemove(index) }
+                                onRemove: { onRemove(index) },
+                                onToggleExcluded: { onToggleExcluded(index, !entry.isExcluded) }
                             )
                         }
                     }
@@ -72,6 +74,7 @@ private struct DeviceRow: View {
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     let onRemove: () -> Void
+    let onToggleExcluded: () -> Void
 
     @State private var isHovered: Bool = false
     @State private var showUnsettableInfo: Bool = false
@@ -88,8 +91,13 @@ private struct DeviceRow: View {
 
     private var clickTooltip: String {
         if entry.isActive { return "" }
+        if entry.isExcluded { return "Use this device (turns auto-selection back on for it)" }
         if entry.isConnected { return "Click to use this device" }
         return "Click to move this device to the top — it'll activate when reconnected"
+    }
+
+    private var excludeTooltip: String {
+        entry.isExcluded ? "Enable auto-selection" : "Disable auto-selection"
     }
 
     var body: some View {
@@ -119,6 +127,18 @@ private struct DeviceRow: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
 
+                    if entry.isExcluded {
+                        Text("manual only")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.secondary.opacity(0.12))
+                            )
+                    }
+
                     if entry.unsettable {
                         UnsettableInfoIcon(isShowing: $showUnsettableInfo)
                     }
@@ -132,6 +152,13 @@ private struct DeviceRow: View {
                 isHovered = hovering && hoverHighlight
             }
             .help(clickTooltip)
+
+            Button(action: onToggleExcluded) {
+                Image(systemName: entry.isExcluded ? "slash.circle.fill" : "slash.circle")
+                    .foregroundColor(entry.isExcluded ? .orange : .secondary.opacity(0.4))
+            }
+            .buttonStyle(.borderless)
+            .help(excludeTooltip)
 
             Button(action: onMoveUp) {
                 Image(systemName: "chevron.up")
@@ -168,6 +195,7 @@ private struct DeviceRow: View {
     private var rowColor: Color {
         if entry.isActive { return .accentColor }
         if !entry.isConnected { return .secondary.opacity(0.55) }
+        if entry.isExcluded { return .secondary }
         return .primary
     }
 

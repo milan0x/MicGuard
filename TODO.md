@@ -2,7 +2,9 @@
 
 ## Feature: Fall through to next priority device when preferred device is unusable
 
-**Status: clamshell case shipped.** `ClamshellMonitor` (IOKit interest notification on `IOPMrootDomain`, re-reads `AppleClamshellState` on any message) feeds the input watchdog's `isDeviceUsable` hook, which skips built-in-transport devices while the lid is closed. Auto-switch and the ActivityMonitor override apply the same filter. System-initiated reverts (device-list flux window) no longer flash "INPUT HELD" or count as hijack stats. Needs verification on real hardware: close lid with external display, confirm fallthrough to next priority device and no menu-bar flash.
+**Status: clamshell case shipped and verified on hardware.** `ClamshellMonitor` (IOKit interest notification on `IOPMrootDomain`, re-reads `AppleClamshellState` on any message) feeds the input watchdog's `isDeviceUsable` hook, which skips built-in-transport devices while the lid is closed. Auto-switch, Re-apply and the ActivityMonitor override apply the same filter. System-initiated reverts (device-list flux window) no longer flash "INPUT HELD" or count as hijack stats.
+
+Hardware verification surfaced the real problem: fallthrough went to the iPhone Continuity mic, because every connected device is auto-appended to the priority list and the phone is "connected" whenever it is nearby. Fix shipped as **per-device auto-selection exclusion** (⃠ toggle on each row, "manual only" tag): excluded devices stay listed for manual picks but are never auto-routed to. Continuity mics are excluded by default the first time they are seen (per-UID marker, so an upgraded install catches up when the phone next appears, and a user who allows one is never overruled). Clicking a row to use it clears the exclusion. The lid feature itself stays: without it the lock would hold a hardware-muted mic and actively block macOS from fixing it.
 
 ### Remaining (general case)
 
@@ -13,7 +15,7 @@ Generalized "device unreachable" detection beyond lid close is still open:
 
 ## Feature: Smart initial device-priority order
 
-On first launch (and whenever a brand-new UID is appended to the priority list), `addDeviceToOrder` in `PreferencesManager.swift` appends to the tail. The first time the user opens MicGuard, the saved order is therefore whatever sequence CoreAudio happened to enumerate devices in — effectively arbitrary. The lock then snaps the system default to the top of that list (`PopoverViewModel.swift:419`), which means a user with Continuity enabled can land on their iPhone microphone the moment they install the app. Worst possible first impression.
+On first launch (and whenever a brand-new UID is appended to the priority list), `addDeviceToOrder` in `PreferencesManager.swift` appends to the tail. The first time the user opens MicGuard, the saved order is therefore whatever sequence CoreAudio happened to enumerate devices in — effectively arbitrary. The lock then snaps the system default to the top of that list. The iPhone case specifically is now covered by default exclusion (see above), so the worst first impression is gone; the ordering of real devices is still arbitrary.
 
 ### Proposed ranking (best → worst)
 

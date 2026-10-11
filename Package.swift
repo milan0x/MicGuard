@@ -16,7 +16,7 @@ let package = Package(
             dependencies: [],
             path: "MicGuard",
             sources: [
-                "App/MicGuardApp.swift",
+                "App/main.swift",
                 "App/AppDelegate.swift",
                 "Core/AudioDeviceManager.swift",
                 "Core/ClamshellMonitor.swift",
@@ -57,7 +57,8 @@ let package = Package(
                 "ProcessMonitorTests.swift",
                 "OutputDeviceWatchdogTests.swift",
                 "OnAirIndicatorTests.swift",
-                "WatchdogYieldTests.swift"
+                "WatchdogYieldTests.swift",
+                "PopoverViewModelTests.swift"
             ]
         )
     ]

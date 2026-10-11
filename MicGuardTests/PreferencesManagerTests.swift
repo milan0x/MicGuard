@@ -298,3 +298,52 @@ final class PreferencesManagerTests: XCTestCase {
         XCTAssertTrue(changedKeys.contains("VolumeControlStrategy"))
     }
 }
+
+// MARK: - Auto-selection exclusion
+
+extension PreferencesManagerTests {
+
+    func testInputExclusionPersistsAndPublishes() {
+        var keys: [String] = []
+        preferencesManager.preferencesChangedPublisher
+            .sink { keys.append($0) }
+            .store(in: &cancellables)
+
+        XCTAssertFalse(preferencesManager.isInputDeviceExcluded("iPhone"))
+        preferencesManager.setInputDeviceExcluded(true, uid: "iPhone")
+        XCTAssertTrue(preferencesManager.isInputDeviceExcluded("iPhone"))
+        XCTAssertEqual(keys, ["ExcludedInputDeviceUIDs"])
+
+        // Idempotent: re-excluding must not re-publish (would re-trigger enforcement).
+        preferencesManager.setInputDeviceExcluded(true, uid: "iPhone")
+        XCTAssertEqual(keys.count, 1)
+
+        preferencesManager.setInputDeviceExcluded(false, uid: "iPhone")
+        XCTAssertFalse(preferencesManager.isInputDeviceExcluded("iPhone"))
+        XCTAssertEqual(keys.count, 2)
+
+        // Survives a fresh manager over the same defaults.
+        preferencesManager.setInputDeviceExcluded(true, uid: "iPhone")
+        let reloaded = PreferencesManager(defaults: testDefaults)
+        XCTAssertTrue(reloaded.isInputDeviceExcluded("iPhone"))
+        XCTAssertFalse(reloaded.isOutputDeviceExcluded("iPhone"), "Input and output lists are independent")
+    }
+
+    func testReplaceDeviceUIDMigratesExclusion() {
+        preferencesManager.preferredInputDeviceOrder = ["old-uid"]
+        preferencesManager.setInputDeviceExcluded(true, uid: "old-uid")
+
+        preferencesManager.replaceDeviceUID(oldUID: "old-uid", newUID: "new-uid")
+
+        XCTAssertTrue(preferencesManager.isInputDeviceExcluded("new-uid"),
+                      "A re-enumerated device must stay excluded under its new UID")
+        XCTAssertFalse(preferencesManager.isInputDeviceExcluded("old-uid"))
+    }
+
+    func testReplaceOutputDeviceUIDMigratesExclusion() {
+        preferencesManager.setOutputDeviceExcluded(true, uid: "old-uid")
+        preferencesManager.replaceOutputDeviceUID(oldUID: "old-uid", newUID: "new-uid")
+        XCTAssertTrue(preferencesManager.isOutputDeviceExcluded("new-uid"))
+        XCTAssertFalse(preferencesManager.isOutputDeviceExcluded("old-uid"))
+    }
+}

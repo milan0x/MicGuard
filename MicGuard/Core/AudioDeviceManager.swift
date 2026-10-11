@@ -37,6 +37,23 @@ struct AudioDevice: Identifiable, Equatable, Hashable {
             || transportType == kAudioDeviceTransportTypeAggregate
     }
 
+    /// iPhone / iPad microphone offered through Continuity Camera. Appears in the
+    /// device list whenever the phone is nearby, so it lands in the priority list
+    /// uninvited — excluded from auto-selection by default, opt-in via the list.
+    var isContinuityCapture: Bool {
+        transportType == kAudioDeviceTransportTypeContinuityCaptureWired
+            || transportType == kAudioDeviceTransportTypeContinuityCaptureWireless
+            || Self.isContinuityName(name)
+    }
+
+    /// Name-based guard for the transport check: macOS names the Continuity mic
+    /// "<Owner>'s iPhone Microphone" / "iPad Microphone". Lets the rule run on
+    /// disconnected entries too, where only the cached name is known.
+    static func isContinuityName(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        return lower.contains("iphone microphone") || lower.contains("ipad microphone")
+    }
+
     static func == (lhs: AudioDevice, rhs: AudioDevice) -> Bool {
         return lhs.uid == rhs.uid
     }

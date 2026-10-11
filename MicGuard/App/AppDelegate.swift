@@ -50,9 +50,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             MGLog.debug("[MicGuard.AppDelegate] clamshell changed closed=\(closed) — re-evaluating input routing")
             let beforeUID = self.audioDeviceManager?.defaultInputDevice?.uid
-            self.deviceWatchdog?.reevaluateEnforcement()
-            self.handleInputAutoSwitch()
-            self.updateActivityMonitorDeviceOverride()
+            self.reevaluateInputRouting()
             // Tell the user why their mic just changed — but only when the lid
             // event actually rerouted input. A lid flip with no routing change
             // stays silent. Called last so it preempts any auto-switch flash.
@@ -78,6 +76,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Start monitoring if locks were previously enabled
         applyStoredPreferences()
+
+        // Launch at login: the system is the truth, the preference is intent.
+        // Re-register if intent says yes but nothing is registered, then make the
+        // stored intent match reality so the toggle never shows a phantom "on".
+        let effective = LaunchAtLoginManager.shared.reconcile(intent: preferencesManager.launchAtLogin)
+        if LaunchAtLoginManager.shared.isBundled, preferencesManager.launchAtLogin != effective {
+            preferencesManager.launchAtLogin = effective
+        }
         
         // Setup notification observers
         setupNotificationObservers()
@@ -155,6 +161,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         outputDeviceWatchdog = OutputDeviceWatchdog(audioDeviceManager: audioManager)
         outputDeviceWatchdog?.autoResumeEnabled = preferencesManager.autoResumeOnTopPriorityPick
+        outputDeviceWatchdog?.isDeviceUsable = { [weak self] device in
+            self?.isUsableOutput(device) ?? true
+        }
 
         outputDeviceWatchdog?.nameForUID = { [weak self] uid in
             self?.preferencesManager.cachedDeviceName(for: uid)
@@ -316,6 +325,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
+        // Re-apply buttons live here, not in the popover: only AppDelegate knows
+        // which devices are usable right now (lid state, exclusions), and a
+        // re-apply that lands on a dead built-in mic just gets reverted again.
+        NotificationCenter.default.publisher(for: .userRequestedReapplyInputPriority)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.reapplyInputPriority()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .userRequestedReapplyOutputPriority)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.reapplyOutputPriority()
+            }
+            .store(in: &cancellables)
+
         // User accepted the "stop fighting?" offer — yield deliberately, and if the
         // offer named the device they were trying to use, switch to it for them.
         NotificationCenter.default.publisher(for: .userRequestedYieldInputProtection)
@@ -428,12 +454,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    /// A device the input watchdog / auto-switch may route to. The built-in mic
-    /// is physically unusable while the lid is closed even though CoreAudio
-    /// keeps it enumerated and alive.
+    /// A device the input watchdog / auto-switch may route to on its own.
+    /// Excluded devices (iPhone Continuity mic by default) are the user's
+    /// "never pick this for me" list. The built-in mic is physically unusable
+    /// while the lid is closed even though CoreAudio keeps it enumerated.
     private func isUsableInput(_ device: AudioDevice) -> Bool {
+        if preferencesManager.isInputDeviceExcluded(device.uid) { return false }
         guard clamshellMonitor?.isLidClosed == true else { return true }
         return device.transportType != kAudioDeviceTransportTypeBuiltIn
+    }
+
+    private func isUsableOutput(_ device: AudioDevice) -> Bool {
+        !preferencesManager.isOutputDeviceExcluded(device.uid)
+    }
+
+    /// Popover "Re-apply": snap the default to the top usable device in priority
+    /// order (no reordering) and clear any yielded lock state.
+    private func reapplyInputPriority() {
+        deviceWatchdog?.resumeProtection()
+        guard let audioManager = audioDeviceManager,
+              let target = bestAutoSwitchInput(),
+              audioManager.defaultInputDevice?.uid != target.uid else { return }
+        MGLog.debug("[MicGuard.AppDelegate] re-apply input → \(target.name)")
+        _ = audioManager.setDefaultInputDevice(target)
+    }
+
+    private func reapplyOutputPriority() {
+        outputDeviceWatchdog?.resumeProtection()
+        guard let audioManager = audioDeviceManager,
+              let target = bestAutoSwitchOutput(),
+              audioManager.defaultOutputDevice?.uid != target.uid else { return }
+        MGLog.debug("[MicGuard.AppDelegate] re-apply output → \(target.name)")
+        _ = audioManager.setDefaultOutputDevice(target)
+    }
+
+    /// Exclusion or lid state changed: whatever is enforcing must re-pick.
+    private func reevaluateInputRouting() {
+        deviceWatchdog?.reevaluateEnforcement()
+        handleInputAutoSwitch()
+        updateActivityMonitorDeviceOverride()
+    }
+
+    private func reevaluateOutputRouting() {
+        outputDeviceWatchdog?.reevaluateEnforcement()
+        handleOutputAutoSwitch()
     }
 
     /// macOS often routes the default AFTER the device-list event — AirPods finish
@@ -547,6 +611,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         MGLog.debug("[MicGuard.AppDelegate] applied per-device output volume \(Int(target * 100))% to \(device.name) ok=\(ok)")
     }
 
+    /// Highest-priority connected, usable output device.
+    private func bestAutoSwitchOutput() -> AudioDevice? {
+        guard let audioManager = audioDeviceManager else { return nil }
+        for uid in preferencesManager.preferredOutputDeviceOrder {
+            if let device = audioManager.device(forUID: uid), device.isOutput, isUsableOutput(device) {
+                return device
+            }
+            if let name = preferencesManager.cachedDeviceName(for: uid) {
+                let matches = audioManager.outputDevices(withName: name)
+                if matches.count == 1, isUsableOutput(matches[0]) {
+                    preferencesManager.replaceOutputDeviceUID(oldUID: uid, newUID: matches[0].uid)
+                    return matches[0]
+                }
+            }
+        }
+        return nil
+    }
+
     private func handleOutputAutoSwitch() {
         guard !preferencesManager.appPaused,
               preferencesManager.outputAutoSwitchEnabled,
@@ -555,34 +637,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Respect a yielded lock — same rationale as handleInputAutoSwitch.
         guard outputDeviceWatchdog?.isYielded != true else { return }
 
-        let priorityOrder = preferencesManager.preferredOutputDeviceOrder
-        guard !priorityOrder.isEmpty else { return }
-
-        // Find the highest-priority connected output device
-        var bestDevice: AudioDevice?
-        for uid in priorityOrder {
-            if let device = audioManager.device(forUID: uid), device.isOutput {
-                bestDevice = device
-                break
-            }
-            // Try name-based fallback
-            if let name = preferencesManager.cachedDeviceName(for: uid) {
-                let matches = audioManager.outputDevices(withName: name)
-                if matches.count == 1 {
-                    bestDevice = matches[0]
-                    preferencesManager.replaceOutputDeviceUID(oldUID: uid, newUID: matches[0].uid)
-                    break
-                }
-            }
-        }
-
-        guard let target = bestDevice,
+        guard let target = bestAutoSwitchOutput(),
               let current = audioManager.defaultOutputDevice,
               current.uid != target.uid else { return }
 
         MGLog.debug("[MicGuard.AppDelegate] OUTPUT SWITCHED (auto-switch) — \(current.name) → \(target.name)")
         _ = audioManager.setDefaultOutputDevice(target)
         statusBarController?.flashLabel("OUTPUT SWITCHED", background: .systemGreen)
+    }
+
+    private func syncWatchdogOrder(_ watchdog: BaseDeviceWatchdog?, with order: [String]) {
+        guard let watchdog = watchdog, watchdog.isWatching,
+              !order.isEmpty, watchdog.devicePriorityOrder != order else { return }
+        MGLog.debug("[MicGuard.AppDelegate] syncing watchdog priority order → \(order)")
+        watchdog.updateDevicePriorityOrder(order)
     }
 
     /// Tells ActivityMonitor which device to treat as the "in use" source for the On Air indicator.
@@ -620,6 +688,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handlePreferenceChange(key: String) {
+        // Exclusion list edits: the excluded device may be the one currently
+        // held (switch away) or a newly allowed higher priority (switch to it).
+        if key == "ExcludedInputDeviceUIDs" {
+            reevaluateInputRouting()
+        }
+        if key == "ExcludedOutputDeviceUIDs" {
+            reevaluateOutputRouting()
+        }
+
+        // Priority-order writes that bypass the .preferred*DeviceChanged
+        // notification — the popover auto-appending a newly seen device, UID
+        // rescues — must still reach a running watchdog, or it keeps enforcing
+        // against a stale copy of the list until the next manual edit.
+        if key == "PreferredInputDeviceOrder" {
+            syncWatchdogOrder(deviceWatchdog, with: preferencesManager.preferredInputDeviceOrder)
+        }
+        if key == "PreferredOutputDeviceOrder" {
+            syncWatchdogOrder(outputDeviceWatchdog, with: preferencesManager.preferredOutputDeviceOrder)
+        }
+
         // Handle Target Volume Change
         if key == "TargetVolume" {
             let newVolume = preferencesManager.targetVolume

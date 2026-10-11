@@ -45,12 +45,9 @@ class ActivityMonitor: ActivityMonitorProtocol {
     var overrideMonitoredDevice: AudioDevice?
 
     
-    // Audio level tracking
+    // Polling fallback for the event-driven running-state listener.
     private var pollingTimer: Timer?
     private let pollingInterval: TimeInterval = 2.0
-    private var lastInputLevel: Float = 0.0
-    private var lastLevelChangeTime: Date = Date()
-    private let micInactivityThreshold: TimeInterval = 2.0 // 2 seconds
     
     // Callbacks
     var onMeetingStarted: (() -> Void)?
@@ -82,8 +79,6 @@ class ActivityMonitor: ActivityMonitorProtocol {
         isMonitoring = true
         
         // Reset state
-        lastInputLevel = 0.0
-        lastLevelChangeTime = Date()
         isMicrophoneActive = false
         isMicrophoneInUse = false
         
@@ -106,10 +101,13 @@ class ActivityMonitor: ActivityMonitorProtocol {
             }
             .store(in: &cancellables)
 
-        // Start polling timer as fallback
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in
+        // Polling fallback. .common mode so it keeps firing while the status-item
+        // context menu is tracking.
+        let timer = Timer(timeInterval: pollingInterval, repeats: true) { [weak self] _ in
             self?.pollInputLevel()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        pollingTimer = timer
 
         // Initial poll
         pollInputLevel()
@@ -139,66 +137,47 @@ class ActivityMonitor: ActivityMonitorProtocol {
         return false
     }
 
-    private func pollInputLevel() {
-        guard isMonitoring,
-              let device = overrideMonitoredDevice ?? audioDeviceManager.defaultInputDevice else {
-            if isMicrophoneInUse {
-                isMicrophoneInUse = false
-                micInUsePublisher.send(false)
-            }
+    // internal (not private) so tests can drive polls — the real triggers are a
+    // CoreAudio listener and a timer the mock layer can't fire.
+    func pollInputLevel() {
+        guard isMonitoring else { return }
+
+        // No resolvable device (list mid-refresh, nothing connected): treat as idle.
+        guard let device = overrideMonitoredDevice ?? audioDeviceManager.defaultInputDevice else {
+            setMicInUse(false, polled: nil)
             return
         }
 
-        let isRunning = checkAnyMicInUse()
+        setMicInUse(checkAnyMicInUse(), polled: device)
 
-        if isRunning != isMicrophoneInUse {
-            MGLog.debug("[MicGuard.Activity] pollInputLevel polled=\(device.name) override=\(overrideMonitoredDevice?.name ?? "nil") systemDefault=\(audioDeviceManager.defaultInputDevice?.name ?? "nil") isRunning=\(isRunning) (was \(isMicrophoneInUse))")
-            isMicrophoneInUse = isRunning
-            micInUsePublisher.send(isRunning)
-        }
-        
-        // Detect process type when mic is in use
-        if isRunning {
+        // Detect process type while the mic is held.
+        if isMicrophoneInUse {
             let usageType = processMonitor.detectActiveAudioProcessType()
             if usageType != currentMicUsageType {
                 currentMicUsageType = usageType
                 micUsageTypePublisher.send(usageType)
             }
-        } else {
-            // Reset to none when mic is not in use
-            if currentMicUsageType != .none {
-                currentMicUsageType = .none
-                micUsageTypePublisher.send(.none)
-            }
+        } else if currentMicUsageType != .none {
+            currentMicUsageType = .none
+            micUsageTypePublisher.send(.none)
         }
+    }
 
-        // Read current input volume — used purely to detect "meeting active" vs idle
-        // by watching for level fluctuations. Not surfaced to UI.
-        guard let level = audioDeviceManager.getInputVolume(for: device) else {
-            return
-        }
-
-        // Check if level has changed
-        let levelChanged = abs(level - lastInputLevel) > 0.001 // Tolerance for float comparison
-        
-        if levelChanged {
-            // Level changed - microphone is being actively used
-            lastInputLevel = level
-            lastLevelChangeTime = Date()
-            
-            if !isMicrophoneActive {
-                isMicrophoneActive = true
-                onMeetingStarted?()
-            }
+    /// Single source of truth for "an app holds the mic". A meeting is exactly
+    /// the span during which some process keeps an input device running —
+    /// `onMeetingStarted` / `onMeetingEnded` fire on the edges of that state so
+    /// the "reset when mic stops" strategy acts when the mic is actually released,
+    /// never on volume churn while a call is still live.
+    private func setMicInUse(_ inUse: Bool, polled device: AudioDevice?) {
+        guard inUse != isMicrophoneInUse else { return }
+        MGLog.debug("[MicGuard.Activity] mic in use=\(inUse) polled=\(device?.name ?? "nil") override=\(overrideMonitoredDevice?.name ?? "nil") systemDefault=\(audioDeviceManager.defaultInputDevice?.name ?? "nil")")
+        isMicrophoneInUse = inUse
+        isMicrophoneActive = inUse
+        micInUsePublisher.send(inUse)
+        if inUse {
+            onMeetingStarted?()
         } else {
-            // Level hasn't changed - check if it's been too long
-            let timeSinceLastChange = Date().timeIntervalSince(lastLevelChangeTime)
-            
-            if timeSinceLastChange >= micInactivityThreshold && isMicrophoneActive {
-                isMicrophoneActive = false
-                onMeetingEnded?()
-            }
+            onMeetingEnded?()
         }
-        
     }
 }

@@ -104,3 +104,33 @@ final class AudioDeviceTests: XCTestCase {
         XCTAssertEqual(device.id, 42)
     }
 }
+
+// MARK: - Transport classification
+
+import CoreAudio
+
+extension AudioDeviceTests {
+
+    func testContinuityCaptureClassification() {
+        let wireless = AudioDevice(id: 1, uid: "a", name: "iPhone", isInput: true, isOutput: false,
+                                   transportType: kAudioDeviceTransportTypeContinuityCaptureWireless)
+        let wired = AudioDevice(id: 2, uid: "b", name: "iPhone", isInput: true, isOutput: false,
+                                transportType: kAudioDeviceTransportTypeContinuityCaptureWired)
+        let builtIn = AudioDevice(id: 3, uid: "c", name: "Mac mic", isInput: true, isOutput: false,
+                                  transportType: kAudioDeviceTransportTypeBuiltIn)
+        let virtual = AudioDevice(id: 4, uid: "d", name: "BlackHole", isInput: true, isOutput: true,
+                                  transportType: kAudioDeviceTransportTypeVirtual)
+
+        XCTAssertTrue(wireless.isContinuityCapture)
+        XCTAssertTrue(wired.isContinuityCapture)
+        XCTAssertFalse(builtIn.isContinuityCapture)
+        XCTAssertFalse(virtual.isContinuityCapture)
+        XCTAssertFalse(wireless.isLikelyUnsettable, "Continuity is a real, settable mic — exclusion, not unsettable")
+
+        // Name guard: unknown transport but a Continuity-style name still counts.
+        let byName = AudioDevice(id: 5, uid: "e", name: "Milan’s iPhone Microphone", isInput: true, isOutput: false)
+        XCTAssertTrue(byName.isContinuityCapture)
+        XCTAssertTrue(AudioDevice.isContinuityName("iPad Microphone"))
+        XCTAssertFalse(AudioDevice.isContinuityName("Shure MV7"))
+    }
+}

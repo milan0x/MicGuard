@@ -83,6 +83,19 @@ protocol PreferencesManaging: AnyObject {
     func outputDeviceVolume(for uid: String) -> Float?
     func setOutputDeviceVolume(_ volume: Float?, for uid: String)
 
+    // Auto-selection exclusion. An excluded device stays in the priority list
+    // (so the user can still pick it by hand) but the lock, auto-switch and the
+    // clamshell fallthrough never route to it on their own.
+    func isInputDeviceExcluded(_ uid: String) -> Bool
+    func setInputDeviceExcluded(_ excluded: Bool, uid: String)
+    func isOutputDeviceExcluded(_ uid: String) -> Bool
+    func setOutputDeviceExcluded(_ excluded: Bool, uid: String)
+    /// Per-device marker: the default-exclusion rule (Continuity mics start
+    /// excluded) runs once per UID, the first time the device is seen connected.
+    /// After that the user's own choice stands, whatever it is.
+    func isAutoExclusionEvaluated(_ uid: String) -> Bool
+    func markAutoExclusionEvaluated(_ uid: String)
+
     // UID migration (for name-based device matching after reconnection)
     func replaceDeviceUID(oldUID: String, newUID: String)
     func replaceOutputDeviceUID(oldUID: String, newUID: String)
@@ -115,6 +128,11 @@ private enum PreferenceKey: String {
 
     // Per-output-device default volume (UID → Float scalar)
     case outputDeviceVolumes = "OutputDeviceVolumes"
+
+    // Devices excluded from automatic selection ([UID])
+    case excludedInputDeviceUIDs = "ExcludedInputDeviceUIDs"
+    case excludedOutputDeviceUIDs = "ExcludedOutputDeviceUIDs"
+    case autoExclusionEvaluatedUIDs = "AutoExclusionEvaluatedUIDs"
 
     // App Settings
     case launchAtLogin = "LaunchAtLogin"
@@ -282,14 +300,14 @@ class PreferencesManager: PreferencesManaging {
     
     // MARK: - App Settings
     
+    /// The user's INTENT. The system (`SMAppService`) is the source of truth for
+    /// what is actually registered; this value exists so launch can self-heal a
+    /// registration that never stuck (see `LaunchAtLoginManager.reconcile`).
     var launchAtLogin: Bool {
         get { defaults.bool(forKey: PreferenceKey.launchAtLogin.rawValue) }
         set {
             defaults.set(newValue, forKey: PreferenceKey.launchAtLogin.rawValue)
             preferencesChangedPublisher.send(PreferenceKey.launchAtLogin.rawValue)
-            
-            // Actually register/unregister with the system
-            LaunchAtLoginManager.shared.setLaunchAtLogin(enabled: newValue)
         }
     }
     
@@ -541,6 +559,56 @@ class PreferencesManager: PreferencesManaging {
         preferencesChangedPublisher.send(PreferenceKey.outputDeviceVolumes.rawValue)
     }
 
+    // MARK: - Auto-Selection Exclusion
+
+    func isInputDeviceExcluded(_ uid: String) -> Bool {
+        excludedUIDs(key: .excludedInputDeviceUIDs).contains(uid)
+    }
+
+    func setInputDeviceExcluded(_ excluded: Bool, uid: String) {
+        setExcluded(excluded, uid: uid, key: .excludedInputDeviceUIDs)
+    }
+
+    func isOutputDeviceExcluded(_ uid: String) -> Bool {
+        excludedUIDs(key: .excludedOutputDeviceUIDs).contains(uid)
+    }
+
+    func setOutputDeviceExcluded(_ excluded: Bool, uid: String) {
+        setExcluded(excluded, uid: uid, key: .excludedOutputDeviceUIDs)
+    }
+
+    func isAutoExclusionEvaluated(_ uid: String) -> Bool {
+        excludedUIDs(key: .autoExclusionEvaluatedUIDs).contains(uid)
+    }
+
+    func markAutoExclusionEvaluated(_ uid: String) {
+        var set = excludedUIDs(key: .autoExclusionEvaluatedUIDs)
+        guard set.insert(uid).inserted else { return }
+        defaults.set(Array(set).sorted(), forKey: PreferenceKey.autoExclusionEvaluatedUIDs.rawValue)
+    }
+
+    private func excludedUIDs(key: PreferenceKey) -> Set<String> {
+        Set(defaults.array(forKey: key.rawValue) as? [String] ?? [])
+    }
+
+    private func setExcluded(_ excluded: Bool, uid: String, key: PreferenceKey) {
+        var set = excludedUIDs(key: key)
+        let changed = excluded ? set.insert(uid).inserted : (set.remove(uid) != nil)
+        guard changed else { return }
+        defaults.set(Array(set).sorted(), forKey: key.rawValue)
+        preferencesChangedPublisher.send(key.rawValue)
+    }
+
+    private func migrateExclusion(oldUID: String, newUID: String, key: PreferenceKey) {
+        var set = excludedUIDs(key: key)
+        guard set.remove(oldUID) != nil else { return }
+        set.insert(newUID)
+        defaults.set(Array(set).sorted(), forKey: key.rawValue)
+        if key != .autoExclusionEvaluatedUIDs {
+            preferencesChangedPublisher.send(key.rawValue)
+        }
+    }
+
     // MARK: - UID Migration
 
     func replaceDeviceUID(oldUID: String, newUID: String) {
@@ -560,6 +628,9 @@ class PreferencesManager: PreferencesManaging {
         if preferredInputDeviceUID == oldUID {
             preferredInputDeviceUID = newUID
         }
+
+        migrateExclusion(oldUID: oldUID, newUID: newUID, key: .excludedInputDeviceUIDs)
+        migrateExclusion(oldUID: oldUID, newUID: newUID, key: .autoExclusionEvaluatedUIDs)
     }
 
     func replaceOutputDeviceUID(oldUID: String, newUID: String) {
@@ -576,6 +647,8 @@ class PreferencesManager: PreferencesManaging {
         if preferredOutputDeviceUID == oldUID {
             preferredOutputDeviceUID = newUID
         }
+
+        migrateExclusion(oldUID: oldUID, newUID: newUID, key: .excludedOutputDeviceUIDs)
     }
 }
 
@@ -591,27 +664,71 @@ enum MoveDirection {
 
 import ServiceManagement
 
-class LaunchAtLoginManager {
+/// Seam for the popover so tests don't touch `SMAppService`.
+protocol LaunchAtLoginProviding: AnyObject {
+    /// Registered and active.
+    var isEnabled: Bool { get }
+    /// Registered, but macOS wants the user to approve it in System Settings.
+    var requiresApproval: Bool { get }
+    /// Returns false when the system refused (unbundled debug binary, SM error).
+    @discardableResult
+    func setLaunchAtLogin(enabled: Bool) -> Bool
+    func openSystemSettings()
+}
+
+final class LaunchAtLoginManager: LaunchAtLoginProviding {
     static let shared = LaunchAtLoginManager()
-    
-    func setLaunchAtLogin(enabled: Bool) {
-        if #available(macOS 13.0, *) {
-            do {
-                if enabled {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-            } catch {
-                // Launch at login registration failed
+
+    /// `SMAppService.mainApp` registers the running bundle at its current path.
+    /// A `swift build` binary has no bundle, so registration can only fail there.
+    var isBundled: Bool {
+        Bundle.main.bundleURL.pathExtension == "app"
+    }
+
+    var status: SMAppService.Status {
+        SMAppService.mainApp.status
+    }
+
+    var isEnabled: Bool { status == .enabled }
+    var requiresApproval: Bool { status == .requiresApproval }
+
+    @discardableResult
+    func setLaunchAtLogin(enabled: Bool) -> Bool {
+        guard isBundled else {
+            MGLog.debug("[MicGuard.LaunchAtLogin] not an app bundle — cannot \(enabled ? "register" : "unregister")")
+            return false
+        }
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
             }
-        } else {
-            // Fallback for older macOS versions
+            MGLog.debug("[MicGuard.LaunchAtLogin] \(enabled ? "registered" : "unregistered") — status now \(status.rawValue)")
+            return true
+        } catch {
+            MGLog.debug("[MicGuard.LaunchAtLogin] \(enabled ? "register" : "unregister") failed: \(error)")
+            return false
         }
     }
-    
-    @available(macOS 13.0, *)
-    var isEnabled: Bool {
-        return SMAppService.mainApp.status == .enabled
+
+    /// Launch-time self-heal: the user asked for launch-at-login but the system
+    /// has no registration (a toggle flipped while running an unbundled build, a
+    /// registration that threw into an empty catch in older versions, a path
+    /// move). Never unregisters — a user who enabled it in System Settings
+    /// directly must not be fought. Returns the effective state.
+    @discardableResult
+    func reconcile(intent: Bool) -> Bool {
+        guard isBundled else { return false }
+        let current = status
+        MGLog.debug("[MicGuard.LaunchAtLogin] reconcile intent=\(intent) status=\(current.rawValue)")
+        if intent, current == .notRegistered || current == .notFound {
+            setLaunchAtLogin(enabled: true)
+        }
+        return isEnabled || requiresApproval
+    }
+
+    func openSystemSettings() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 }
