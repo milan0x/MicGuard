@@ -24,7 +24,7 @@ Layered components with dependency injection and Combine-based reactive communic
 - `MicGuard/App/` — `main.swift` (plain AppKit entry: `NSApplication` + `AppDelegate`; no SwiftUI `App`, because a SwiftUI app needs at least one scene and the placeholder `Settings` scene showed up as an empty window on ⌘,) and `AppDelegate` (coordinates everything)
 - `MicGuard/Core/` — `AudioDeviceManager`, `ClamshellMonitor`, `DeviceWatchdog` (file contains `BaseDeviceWatchdog`, `DeviceWatchdog`, `OutputDeviceWatchdog`), `VolumeGuard`, `ActivityMonitor`, `ProcessMonitor`
 - `MicGuard/UI/` — `StatusBarController` (thin shell, ~220 lines), `OnAirIndicator` (menu-bar icon states, flash labels, pulse)
-- `MicGuard/UI/MenuPopover/` — `PopoverViewModel` (`@MainActor ObservableObject` bridging managers to SwiftUI), `PopoverContentView` (tabbed root view: Input / Output / Settings), `DevicePriorityListView` (drag-reorderable device list)
+- `MicGuard/UI/MenuPopover/` — `PopoverViewModel` (`@MainActor ObservableObject` bridging managers to SwiftUI), `PopoverContentView` (tabbed root view: Input / Output / Settings), `DevicePriorityListView` (priority list with up/down chevrons, per-row use / exclude / remove)
 - `MicGuard/Utilities/` — `PreferencesManager`, `StatsManager`, `NotificationManager` (dormant), `MGLog` (debug-only logger, compiled out in Release)
 - `MicGuardTests/Mocks/` — `MockAudioDeviceManager` for protocol-based testing
 
