@@ -1,7 +1,7 @@
 # MicGuard Audit — 2026-06-12
 
 Full code + UX review (core engine, app/UI/persistence, product). All findings
-verified against actual code. Items already tracked in KNOWN_ISSUES.md / TODO.md
+verified against actual code. Items already tracked in AI_CONTEXT.md (Known Limitations) / TODO.md
 are excluded unless the reality turned out worse than documented.
 Test suite at time of audit: 111/111 passing.
 
@@ -14,7 +14,7 @@ Test suite at time of audit: 111/111 passing.
   When Zoom's AGC lowers the input volume and it stabilizes for 2s, `onMeetingEnded`
   fires during the call and AppDelegate (`App/AppDelegate.swift:159-172`) snaps the
   volume back up mid-meeting. A meeting where the volume setting never changes never
-  registers as started. (Worse than KNOWN_ISSUES describes; AI_CONTEXT's data-flow
+  registers as started. (Worse than the docs described; AI_CONTEXT's data-flow
   description doesn't match the code.)
   Fix: gate `onMeetingEnded` on the `isRunning` true→false transition — the value is
   already computed three lines above.
