@@ -100,7 +100,7 @@ repeated here.
   `.accessibilityLabel`; hand-rolled radio rows (`VolumeStrategyRow`,
   `MicIndicatorOption`) lack the `.isSelected` trait; the on-air pill passes
   `accessibilityDescription: nil`.
-- [ ] Popover forces `minHeight: 500` — dead space on sparse tabs.
+- [ ] Popover scroll area always takes its full `maxHeight: 620` — dead space on sparse tabs.
 - [ ] README screenshot predates the SwiftUI popover.
 
 ## Worth building

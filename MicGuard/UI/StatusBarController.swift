@@ -27,6 +27,11 @@ class StatusBarController {
 
     private var onAirIndicator: OnAirIndicator?
     private var viewModel: PopoverViewModel?
+    private var hostingController: NSHostingController<PopoverContentView>?
+
+    private static let popoverWidth: CGFloat = 360
+    /// Room for the popover arrow plus a small gap above the Dock.
+    private static let popoverScreenMargin: CGFloat = 40
 
     // MARK: - Initialization
 
@@ -167,10 +172,28 @@ class StatusBarController {
         )
         self.viewModel = vm
 
+        let hosting = NSHostingController(rootView: PopoverContentView(viewModel: vm))
+        // The popover size is set explicitly before each show (sizePopoverToFit).
+        // With the default sizing options the hosting view's min-size constraints
+        // grow the popover window upward from its origin when the content is taller
+        // than contentSize, pushing the header off the top of the screen.
+        hosting.sizingOptions = []
+        self.hostingController = hosting
+
         popover.behavior = .transient
         popover.animates = true
-        popover.contentSize = NSSize(width: 360, height: 500)
-        popover.contentViewController = NSHostingController(rootView: PopoverContentView(viewModel: vm))
+        popover.contentViewController = hosting
+    }
+
+    /// Size the popover to its SwiftUI content, capped to the screen it opens on.
+    /// The tab's scroll area is flexible, so on short screens it shrinks instead
+    /// of the popover running off-screen.
+    private func sizePopoverToFit(below button: NSStatusBarButton) {
+        guard let hosting = hostingController else { return }
+        let screen = button.window?.screen ?? NSScreen.main
+        let available = (screen?.visibleFrame.height ?? 800) - Self.popoverScreenMargin
+        let fitting = hosting.sizeThatFits(in: NSSize(width: Self.popoverWidth, height: available))
+        popover.contentSize = NSSize(width: Self.popoverWidth, height: min(fitting.height, available))
     }
 
     // MARK: - Popover control
@@ -181,6 +204,7 @@ class StatusBarController {
             closePopover()
         } else {
             viewModel?.refreshAll()
+            sizePopoverToFit(below: button)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
 

@@ -71,7 +71,8 @@ struct PopoverContentView: View {
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(minHeight: 500, maxHeight: 620)
+                // Flexible so the popover can shrink to fit short screens.
+                .frame(minHeight: 240, maxHeight: 620)
             }
             .disabled(viewModel.appPaused)
             .opacity(viewModel.appPaused ? 0.45 : 1)
